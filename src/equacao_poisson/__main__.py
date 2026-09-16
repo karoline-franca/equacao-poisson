@@ -1,5 +1,5 @@
-"""oscilador_van_der_pol file for ensuring the package is executable
-as `oscilador-van-der-pol` and `python -m oscilador_van_der_pol`
+"""equacao_poisson file for ensuring the package is executable
+as `equacao-poisson` and `python -m equacao_poisson`
 """
 import sys
 from pathlib import Path

@@ -1,7 +1,7 @@
 [project]
-name = "oscilador_van_der_pol"
+name = "equacao_poisson"
 version = "0.1.0"
-description = "Oscilador Van der Pol com RK4 e PyTorch"
+description = "Equação de Poisson com RK4 e PyTorch"
 readme = "README.md"
 requires-python = ">=3.8"
 dependencies = [
@@ -16,11 +16,11 @@ dependencies = [
 ]
 
 [project.entry-points."kedro.project_plugins"]
-oscilador_van_der_pol = "oscilador_van_der_pol.plugins"
+equacao_poisson = "equacao_poisson.plugins"
 
 [tool.kedro]
-package_name = "oscilador_van_der_pol"
-project_name = "oscilador_van_der_pol"
+package_name = "equacao_poisson"
+project_name = "equacao_poisson"
 kedro_init_version = "1.3.0"
 
 [build-system]

@@ -1,4 +1,4 @@
-"""oscilador_van_der_pol
+"""equacao_poisson
 """
 
 __version__ = "0.1"
