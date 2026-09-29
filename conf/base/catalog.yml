@@ -2,9 +2,9 @@
 # PIPELINE P00 - GERAÇÃO DE BASES DE DADOS
 # ============================================================
 
-condicoes_iniciais:
+distribuicoes_carga:
   type: pandas.CSVDataset
-  filepath: data/02_intermediate/${runtime_params:data_version,default_v1}/condicoes_iniciais.csv
+  filepath: data/02_intermediate/${runtime_params:data_version,default_v1}/distribuicoes_carga.csv
   load_args:
     sep: ';'
     encoding: 'latin-1'
@@ -13,9 +13,9 @@ condicoes_iniciais:
     sep: ';'
     encoding: 'latin-1'
 
-parametros_oscilador:
+parametros_eletrostatico:
   type: pandas.CSVDataset
-  filepath: data/02_intermediate/${runtime_params:data_version,default_v1}/parametros_oscilador.csv
+  filepath: data/02_intermediate/${runtime_params:data_version,default_v1}/parametros_eletrostatico.csv
   load_args:
     sep: ';'
     encoding: 'latin-1'
@@ -24,13 +24,13 @@ parametros_oscilador:
     sep: ';'
     encoding: 'latin-1'
 
-solucao_rk4:
+solucao_espectral:
   type: pickle.PickleDataset
-  filepath: data/03_primary/${runtime_params:data_version,default_v1}/solucao_rk4.pkl
+  filepath: data/03_primary/${runtime_params:data_version,default_v1}/solucao_espectral.pkl
 
-base_oscilador:
+base_eletrostatica:
   type: pandas.CSVDataset
-  filepath: data/04_feature/${runtime_params:data_version,default_v1}/base_vdp.csv
+  filepath: data/04_feature/${runtime_params:data_version,default_v1}/base_poisson.csv
   load_args:
     sep: ';'
     encoding: 'latin-1'

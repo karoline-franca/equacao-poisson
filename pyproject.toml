@@ -1,7 +1,7 @@
 [project]
 name = "equacao_poisson"
 version = "0.1.0"
-description = "Equação de Poisson com RK4 e PyTorch"
+description = "Equação de Poisson com métodos espectrais e PyTorch"
 readme = "README.md"
 requires-python = ">=3.8"
 dependencies = [

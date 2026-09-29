@@ -1,29 +1,28 @@
 simulation:
-  n_sistemas: 1
-  n_condicoes_iniciais: 500
-  num_periodos: 1
-  dt: 0.1
-  save_every: 2
+  n_cargas: 1
+
+densidade_carga:
+  tipo: senoide
+  parametros:
+    amplitude_fator: 7.402203300817018     # A = fator × ε₀  (fator = 3π²/4)
+    n: 1
+    m: 1
+    l: 1
 
 intervals:
-  parametro_mu: -0.1                  # parâmetro de não linearidade
-  x0_min: -3.0                        # posição inicial mínima
-  x0_max: 3.0                         # posição inicial máxima
-  y0_min: -3.0                        # velocidade inicial mínima
-  y0_max: 3.0                         # velocidade inicial máxima
+  parametro_eps0: 8.8541878128e-12
+
+solver:
+  N: 20
+  dominio:
+    xmin: -1.0
+    xmax: 1.0
+    ymin: -1.0
+    ymax: 1.0
+    zmin: -1.0
+    zmax: 1.0
 
 seed: 42
-
-visualization:
-  width_3d: 1200
-  height_3d: 900
-  width_2d: 1400
-  height_2d: 1000
-  legend_font_size: 12
-  hover_font_size: 12
-
-outputs:
-  base_csv: "base_vdp.csv"
 
 mlp:
   hidden_dims: [64, 128, 256]       # camadas ocultas
