@@ -27,7 +27,7 @@ seed: 42
 mlp:
   hidden_dims: [64, 128, 256]       # camadas ocultas
   activation: "relu"                # função de ativação
-  batch_size: 512                   # tamanho do batch
+  batch_size: 128                   # tamanho do batch
   epochs: 500                       # número de épocas
   learning_rate: 0.001              # taxa de aprendizado
   weight_decay: 0.0001              # regularização L2
