@@ -284,7 +284,7 @@ def cria_grafico_3d(solucao):
                     f"<span style='font-size:20px; font-weight:bold;'>"
                     f"Potencial Eletrostático 3D — Equação de Poisson</span><br><br>"
                     f"<span style='font-size:16px; color:#555555;'>"
-                    f"Cortes ortogonais | Carga {i_carga} | "
+                    f"Cortes Ortogonais | Carga {i_carga} | "
                     f"Grau N = {N} | ε₀ = {eps0:.3e}</span>"}
             ],
         ))
@@ -294,7 +294,7 @@ def cria_grafico_3d(solucao):
             text=f"<span style='font-size:20px; font-weight:bold;'>"
                  f"Potencial Eletrostático 3D — Equação de Poisson</span><br><br>"
                  f"<span style='font-size:16px; color:#555555;'>"
-                 f"Cortes ortogonais | Carga 0 | "
+                 f"Cortes Ortogonais | Carga 0 | "
                  f"Grau N = {N} | ε₀ = {eps0:.3e}</span>",
             x=0.50, y=0.95, font=dict(size=20),
         ),
@@ -324,550 +324,722 @@ def cria_grafico_3d(solucao):
 
     return fig
 
-# def cria_grafico_distribuicao_dados(
-#     y_pos_train, y_vel_train,
-#     y_pos_val, y_vel_val,
-#     y_pos_test, y_vel_test,
-#     titulo="Distribuição dos Dados no Espaço de Fases - Oscilador de Van der Pol"
-# ):
-#     """
-#     Cria gráfico 2D mostrando a distribuição dos dados de treino, validação e teste no espaço de fases.
-#     Para trajetórias completas, os dados são achatados para visualização pontual.
-    
-#     Args:
-#         y_pos_train: Posições de treino
-#         y_vel_train: Velocidades de treino
-#         y_pos_val: Posições de validação
-#         y_vel_val: Velocidades de validação
-#         y_pos_test: Posições de teste
-#         y_vel_test: Velocidades de teste
-#         titulo: Título do gráfico
-        
-#     Returns:
-#         Figura Plotly
-#     """
-#     fig = go.Figure()
-    
-#     # achata as trajetórias para visualização
-#     y_pos_train_flat = y_pos_train.flatten() if y_pos_train.ndim > 1 else y_pos_train
-#     y_vel_train_flat = y_vel_train.flatten() if y_vel_train.ndim > 1 else y_vel_train
-#     y_pos_val_flat = y_pos_val.flatten() if y_pos_val.ndim > 1 else y_pos_val
-#     y_vel_val_flat = y_vel_val.flatten() if y_vel_val.ndim > 1 else y_vel_val
-#     y_pos_test_flat = y_pos_test.flatten() if y_pos_test.ndim > 1 else y_pos_test
-#     y_vel_test_flat = y_vel_test.flatten() if y_vel_test.ndim > 1 else y_vel_test
-    
-#     # treino
-#     fig.add_trace(go.Scatter(
-#         x=y_pos_train_flat,
-#         y=y_vel_train_flat,
-#         mode='markers',
-#         name='Dados de Treino (70%)',
-#         marker=dict(
-#             color='#2E7D32',
-#             size=4,
-#             opacity=0.9,
-#             symbol='circle'
-#         ),
-#         hovertemplate=(
-#             f"<b>Dados de Treino</b><br>" +
-#             f"Posição: %{{x:.3f}}<br>" +
-#             f"Velocidade: %{{y:.3f}}<br>" +
-#             f"<extra></extra>"
-#         )
-#     ))
-    
-#     # validação
-#     fig.add_trace(go.Scatter(
-#         x=y_pos_val_flat,
-#         y=y_vel_val_flat,
-#         mode='markers',
-#         name='Dados de Validação (20%)',
-#         marker=dict(
-#             color='#0D47A1',
-#             size=4,
-#             opacity=0.9,
-#             symbol='square'
-#         ),
-#         hovertemplate=(
-#             f"<b>Dados de Validação</b><br>" +
-#             f"Posição: %{{x:.3f}}<br>" +
-#             f"Velocidade: %{{y:.3f}}<br>" +
-#             f"<extra></extra>"
-#         )
-#     ))
-    
-#     # teste
-#     fig.add_trace(go.Scatter(
-#         x=y_pos_test_flat,
-#         y=y_vel_test_flat,
-#         mode='markers',
-#         name='Dados de Teste (10%)',
-#         marker=dict(
-#             color='#F57F17',
-#             size=4,
-#             opacity=0.9,
-#             symbol='diamond'
-#         ),
-#         hovertemplate=(
-#             f"<b>Dados de Teste</b><br>" +
-#             f"Posição: %{{x:.3f}}<br>" +
-#             f"Velocidade: %{{y:.3f}}<br>" +
-#             f"<extra></extra>"
-#         )
-#     ))
-    
-#     n_train = len(y_pos_train_flat)
-#     n_val = len(y_pos_val_flat)
-#     n_test = len(y_pos_test_flat)
-#     total = n_train + n_val + n_test
-    
-#     fig.update_layout(
-#         title=dict(
-#             text=f"<span style='font-size:20px; font-weight:bold;'>{titulo}</span><br><br>" +
-#                  f"<span style='font-size:20px; color:#555555;'>" +
-#                  f"<sup>Treino: {n_train} ({n_train/total*100:.1f}%) | " +
-#                  f"Validação: {n_val} ({n_val/total*100:.1f}%) | " +
-#                  f"Teste: {n_test} ({n_test/total*100:.1f}%)</sup>",
-#             x=0.50,
-#             y=0.95,
-#             font=dict(size=20)
-#         ),
-#         xaxis_title="Posição",
-#         yaxis_title="Velocidade",
-#         width=1400,
-#         height=1000,
-#         legend=dict(
-#             title="Legenda",
-#             x=0.85,
-#             y=0.98,
-#             bgcolor='rgba(255, 255, 255, 0.9)',
-#             bordercolor='black',
-#             borderwidth=1,
-#             font=dict(size=16),
-#             itemclick="toggle",
-#             itemdoubleclick="toggleothers"
-#         ),
-#         hovermode='closest',
-#         plot_bgcolor='white',
-#         margin=dict(t=150),
-#         xaxis=dict(
-#             showgrid=False,
-#             gridcolor='lightgray',
-#             zeroline=True,
-#             zerolinecolor='black',
-#             zerolinewidth=1,
-#             title_font=dict(size=16),
-#             tickfont=dict(size=16)
-#         ),
-#         yaxis=dict(
-#             showgrid=False,
-#             gridcolor='lightgray',
-#             zeroline=True,
-#             zerolinecolor='black',
-#             zerolinewidth=1,
-#             title_font=dict(size=16),
-#             tickfont=dict(size=16)
-#         )
-#     )
-    
-#     return fig
+def cria_grafico_distribuicao_amplitudes(
+    amplitudes,
+    titulo="Distribuição das Amplitudes - Equação de Poisson 3D"
+):
+    """
+    Cria gráfico 2D mostrando a distribuição das amplitudes (de ρ ou φ)
+    por distribuição de carga.
+
+    Args:
+        amplitudes: Array com as amplitudes por carga
+        titulo: Título do gráfico
+
+    Returns:
+        Figura Plotly
+    """
+    fig = go.Figure()
+
+    amplitudes_flat = np.asarray(amplitudes).flatten()
+
+    fig.add_trace(go.Histogram(
+        x=amplitudes_flat,
+        nbinsx=30,
+        name='Amplitudes',
+        marker=dict(
+            color='#2E7D32',
+            opacity=0.85,
+            line=dict(color='black', width=0.5),
+        ),
+        hovertemplate=(
+            "<b>Amplitude</b><br>" +
+            "Intervalo: %{x:.4f}<br>" +
+            "Contagem: %{y}<br>" +
+            "<extra></extra>"
+        ),
+    ))
+
+    n_total = len(amplitudes_flat)
+    amp_min = float(np.min(amplitudes_flat))
+    amp_max = float(np.max(amplitudes_flat))
+    amp_med = float(np.median(amplitudes_flat))
+
+    fig.update_layout(
+        title=dict(
+            text=f"<span style='font-size:20px; font-weight:bold;'>{titulo}</span><br><br>" +
+                 f"<span style='font-size:20px; color:#555555;'>" +
+                 f"<sup>Total: {n_total} | " +
+                 f"Mín: {amp_min:.4f} | " +
+                 f"Mediana: {amp_med:.4f} | " +
+                 f"Máx: {amp_max:.4f}</sup>",
+            x=0.50,
+            y=0.95,
+            font=dict(size=20)
+        ),
+        xaxis_title="Amplitude Máxima",
+        yaxis_title="Frequência",
+        width=1400,
+        height=1000,
+        legend=dict(
+            title="Legenda",
+            x=0.85,
+            y=0.98,
+            bgcolor='rgba(255, 255, 255, 0.9)',
+            bordercolor='black',
+            borderwidth=1,
+            font=dict(size=16),
+            itemclick="toggle",
+            itemdoubleclick="toggleothers"
+        ),
+        hovermode='closest',
+        plot_bgcolor='white',
+        margin=dict(t=150),
+        bargap=0.05,
+        xaxis=dict(
+            showgrid=False,
+            gridcolor='lightgray',
+            zeroline=True,
+            zerolinecolor='black',
+            zerolinewidth=1,
+            title_font=dict(size=16),
+            tickfont=dict(size=16)
+        ),
+        yaxis=dict(
+            showgrid=False,
+            gridcolor='lightgray',
+            zeroline=True,
+            zerolinecolor='black',
+            zerolinewidth=1,
+            title_font=dict(size=16),
+            tickfont=dict(size=16)
+        )
+    )
+
+    return fig
 
 
-# def cria_grafico_historico_treinamento(
-#     history: Dict,
-#     titulo: str = "Evolução da Função de Custo durante o Treinamento - Oscilador de Van der Pol"
-# ) -> go.Figure:
-#     """
-#     Cria gráfico da evolução das funções de custo de treino e validação ao longo das épocas.
-    
-#     Args:
-#         history: Dicionário contendo 'train_loss' e 'val_loss'
-#         titulo: Título do gráfico
-        
-#     Returns:
-#         Figura Plotly
-#     """
-    
-#     epochs = list(range(1, len(history['train_loss']) + 1))
-    
-#     fig = go.Figure()
-    
-#     # função de custo de treino
-#     fig.add_trace(go.Scatter(
-#         x=epochs,
-#         y=history['train_loss'],
-#         mode='lines',
-#         name='Loss de Treino',
-#         line=dict(color='#2E7D32', width=2),
-#         hovertemplate=(
-#             f"<b>Loss de Treino</b><br>" +
-#             f"Época: %{{x}}<br>" +
-#             f"Loss: %{{y:.6f}}<br>" +
-#             f"<extra></extra>"
-#         )
-#     ))
-    
-#     # loss de validação
-#     fig.add_trace(go.Scatter(
-#         x=epochs,
-#         y=history['val_loss'],
-#         mode='lines',
-#         name='Loss de Validação',
-#         line=dict(color='#B71C1C', width=2),
-#         hovertemplate=(
-#             f"<b>Loss de Validação</b><br>" +
-#             f"Época: %{{x}}<br>" +
-#             f"Loss: %{{y:.6f}}<br>" +
-#             f"<extra></extra>"
-#         )
-#     ))
-        
-#     fig.update_layout(
-#         title=dict(
-#             text=f"<span style='font-size:20px; font-weight:bold;'>{titulo}</span><br><br>",
-#             x=0.5,
-#             y=0.95,
-#             font=dict(size=16)
-#         ),
-#         xaxis_title="Época",
-#         yaxis_title="Função de Custo (RMSE)",
-#         width=1400,
-#         height=800,
-#         legend=dict(
-#             title="Legenda",
-#             x=0.85,
-#             y=0.95,
-#             xanchor='left',
-#             yanchor='top',
-#             bgcolor='rgba(255, 255, 255, 0.95)',
-#             bordercolor='gray',
-#             borderwidth=1,
-#             font=dict(size=14),
-#             itemclick="toggle",
-#             itemdoubleclick="toggleothers"
-#         ),
-#         hovermode='closest',
-#         plot_bgcolor='white',
-#         paper_bgcolor='white',
-#         margin=dict(t=150, b=80, l=80, r=80),
-#         xaxis=dict(
-#             showgrid=True,
-#             gridcolor='lightgray',
-#             gridwidth=0.5,
-#             zeroline=True,
-#             zerolinecolor='lightgray',
-#             zerolinewidth=1,
-#             title_font=dict(size=16),
-#             tickfont=dict(size=14)
-#         ),
-#         yaxis=dict(
-#             showgrid=True,
-#             gridcolor='lightgray',
-#             gridwidth=0.5,
-#             zeroline=True,
-#             zerolinecolor='lightgray',
-#             zerolinewidth=1,
-#             title_font=dict(size=16),
-#             tickfont=dict(size=14),
-#             type='log'
-#         )
-#     )
-    
-#     return fig
+def cria_grafico_distribuicao_dados(
+    y_carga_train, y_pot_train,
+    y_carga_val,   y_pot_val,
+    y_carga_test,  y_pot_test,
+    titulo="Distribuição dos Dados - Equação de Poisson 3D (por ponto)"
+):
+    """
+    Cria gráfico 2D mostrando a distribuição dos dados de densidade de carga ρ
+    e potencial φ para treino, validação e teste.
+
+    Cada ponto da malha é uma amostra, então os arrays são achatados para
+    visualização pontual.
+
+    Args:
+        y_carga_train: Densidades de carga de treino
+        y_pot_train:   Potenciais de treino
+        y_carga_val:   Densidades de carga de validação
+        y_pot_val:     Potenciais de validação
+        y_carga_test:  Densidades de carga de teste
+        y_pot_test:    Potenciais de teste
+        titulo: Título do gráfico
+
+    Returns:
+        Figura Plotly
+    """
+    fig = go.Figure()
+
+    # achata os arrays para visualização
+    y_carga_train_flat = y_carga_train.flatten() if y_carga_train.ndim > 1 else y_carga_train
+    y_pot_train_flat   = y_pot_train.flatten()   if y_pot_train.ndim   > 1 else y_pot_train
+    y_carga_val_flat   = y_carga_val.flatten()   if y_carga_val.ndim   > 1 else y_carga_val
+    y_pot_val_flat     = y_pot_val.flatten()     if y_pot_val.ndim     > 1 else y_pot_val
+    y_carga_test_flat  = y_carga_test.flatten()  if y_carga_test.ndim  > 1 else y_carga_test
+    y_pot_test_flat    = y_pot_test.flatten()    if y_pot_test.ndim    > 1 else y_pot_test
+
+    # treino
+    fig.add_trace(go.Scatter(
+        x=y_carga_train_flat,
+        y=y_pot_train_flat,
+        mode='markers',
+        name='Dados de Treino (70%)',
+        marker=dict(
+            color='#2E7D32',
+            size=4,
+            opacity=0.9,
+            symbol='circle'
+        ),
+        hovertemplate=(
+            "<b>Dados de Treino</b><br>" +
+            "ρ: %{x:.3e}<br>" +
+            "φ: %{y:.3e}<br>" +
+            "<extra></extra>"
+        )
+    ))
+
+    # validação
+    fig.add_trace(go.Scatter(
+        x=y_carga_val_flat,
+        y=y_pot_val_flat,
+        mode='markers',
+        name='Dados de Validação (20%)',
+        marker=dict(
+            color='#0D47A1',
+            size=4,
+            opacity=0.9,
+            symbol='square'
+        ),
+        hovertemplate=(
+            "<b>Dados de Validação</b><br>" +
+            "ρ: %{x:.3e}<br>" +
+            "φ: %{y:.3e}<br>" +
+            "<extra></extra>"
+        )
+    ))
+
+    # teste
+    fig.add_trace(go.Scatter(
+        x=y_carga_test_flat,
+        y=y_pot_test_flat,
+        mode='markers',
+        name='Dados de Teste (10%)',
+        marker=dict(
+            color='#F57F17',
+            size=4,
+            opacity=0.9,
+            symbol='diamond'
+        ),
+        hovertemplate=(
+            "<b>Dados de Teste</b><br>" +
+            "ρ: %{x:.3e}<br>" +
+            "φ: %{y:.3e}<br>" +
+            "<extra></extra>"
+        )
+    ))
+
+    n_train = len(y_carga_train_flat)
+    n_val   = len(y_carga_val_flat)
+    n_test  = len(y_carga_test_flat)
+    total   = n_train + n_val + n_test
+
+    fig.update_layout(
+        title=dict(
+            text=f"<span style='font-size:20px; font-weight:bold;'>{titulo}</span><br><br>" +
+                 f"<span style='font-size:20px; color:#555555;'>" +
+                 f"<sup>Treino: {n_train} ({n_train/total*100:.1f}%) | " +
+                 f"Validação: {n_val} ({n_val/total*100:.1f}%) | " +
+                 f"Teste: {n_test} ({n_test/total*100:.1f}%)</sup>",
+            x=0.50,
+            y=0.95,
+            font=dict(size=20)
+        ),
+        xaxis_title="Densidade de Carga ρ(x,y,z) [C/m³]",
+        yaxis_title="Potencial Elétrico φ(x,y,z) [V]",
+        width=1400,
+        height=1000,
+        legend=dict(
+            title="Legenda",
+            x=0.85,
+            y=0.98,
+            bgcolor='rgba(255, 255, 255, 0.9)',
+            bordercolor='black',
+            borderwidth=1,
+            font=dict(size=16),
+            itemclick="toggle",
+            itemdoubleclick="toggleothers"
+        ),
+        hovermode='closest',
+        plot_bgcolor='white',
+        margin=dict(t=150),
+        xaxis=dict(
+            showgrid=False,
+            gridcolor='lightgray',
+            zeroline=True,
+            zerolinecolor='black',
+            zerolinewidth=1,
+            title_font=dict(size=16),
+            tickfont=dict(size=16)
+        ),
+        yaxis=dict(
+            showgrid=False,
+            gridcolor='lightgray',
+            zeroline=True,
+            zerolinecolor='black',
+            zerolinewidth=1,
+            title_font=dict(size=16),
+            tickfont=dict(size=16)
+        )
+    )
+
+    return fig
 
 
-# def cria_grafico_real_previsto_mlp(predictions, y_true, titulo="Previsões do Modelo MLP - Oscilador de Van der Pol"):
-#     """
-#     Cria gráficos de dispersão para visualizar as previsões do modelo MLP.
-#     Para trajetórias completas, os dados são achatados para visualização pontual.
-    
-#     Args:
-#         predictions: array com as previsões (n_trajetorias, 2*n_timesteps) - trajetórias completas
-#         y_true: array com os valores reais (n_trajetorias, 2*n_timesteps) - trajetórias completas
-#         titulo: título do gráfico
-        
-#     Returns:
-#         Figura Plotly
-#     """
-#     fig = make_subplots(
-#         rows=1, cols=2,
-#         subplot_titles=('Posição', 'Velocidade'),
-#         horizontal_spacing=0.15
-#     )
-    
-#     # achata as trajetórias para visualização pontual
-#     if predictions.ndim > 1:
-#         # separa posição e velocidade das trajetórias
-#         posicao_pred = predictions[:, 0::2].flatten()
-#         velocidade_pred = predictions[:, 1::2].flatten()
-#         posicao_true = y_true[:, 0::2].flatten()
-#         velocidade_true = y_true[:, 1::2].flatten()
-#     else:
-#         posicao_pred = predictions[:, 0]
-#         velocidade_pred = predictions[:, 1]
-#         posicao_true = y_true[:, 0]
-#         velocidade_true = y_true[:, 1]
-    
-#     cores = ['blue', 'green']
-#     nomes = ['Posição', 'Velocidade']
-    
-#     # posição
-#     fig.add_trace(
-#         go.Scatter(
-#             x=posicao_true,
-#             y=posicao_pred,
-#             mode='markers',
-#             name='Posição',
-#             marker=dict(
-#                 color=cores[0],
-#                 size=3,
-#                 opacity=0.5
-#             ),
-#             hovertemplate=(
-#                 f"<b>Posição</b><br>" +
-#                 f"Valor Real: %{{x:.3f}}<br>" +
-#                 f"Valor Previsto: %{{y:.3f}}<br>" +
-#                 f"<extra></extra>"
-#             )
-#         ),
-#         row=1, col=1
-#     )
-    
-#     # velocidade
-#     fig.add_trace(
-#         go.Scatter(
-#             x=velocidade_true,
-#             y=velocidade_pred,
-#             mode='markers',
-#             name='Velocidade',
-#             marker=dict(
-#                 color=cores[1],
-#                 size=3,
-#                 opacity=0.5
-#             ),
-#             hovertemplate=(
-#                 f"<b>Velocidade</b><br>" +
-#                 f"Valor Real: %{{x:.3f}}<br>" +
-#                 f"Valor Previsto: %{{y:.3f}}<br>" +
-#                 f"<extra></extra>"
-#             )
-#         ),
-#         row=1, col=2
-#     )
-    
-#     # linha y=x (referência) para ambos os gráficos
-#     for i in range(2):
-#         if i == 0:
-#             min_val = min(posicao_true.min(), posicao_pred.min())
-#             max_val = max(posicao_true.max(), posicao_pred.max())
-#         else:
-#             min_val = min(velocidade_true.min(), velocidade_pred.min())
-#             max_val = max(velocidade_true.max(), velocidade_pred.max())
-        
-#         fig.add_trace(
-#             go.Scatter(
-#                 x=[min_val, max_val],
-#                 y=[min_val, max_val],
-#                 mode='lines',
-#                 name='Referência (y=x)',
-#                 line=dict(color='red', width=2, dash='dash'),
-#                 showlegend=(i == 0),
-#                 hovertemplate='Referência: %{x:.3f}<extra></extra>'
-#             ),
-#             row=1, col=i+1
-#         )
-        
-#         fig.update_xaxes(
-#             title_text=f'Valor Real {nomes[i]}',
-#             row=1, col=i+1,
-#             showgrid=True,
-#             gridcolor='lightgray',
-#             zeroline=True,
-#             zerolinecolor='lightgray',
-#             zerolinewidth=1,
-#             title_font=dict(size=16),
-#             tickfont=dict(size=16)
-#         )
-        
-#         fig.update_yaxes(
-#             title_text=f'Valor Previsto {nomes[i]}',
-#             row=1, col=i+1,
-#             showgrid=True,
-#             gridcolor='lightgray',
-#             zeroline=True,
-#             zerolinecolor='lightgray',
-#             zerolinewidth=1,
-#             title_font=dict(size=16),
-#             tickfont=dict(size=16)
-#         )
-    
-#     rmse_posicao = np.sqrt(mean_squared_error(posicao_true, posicao_pred))
-#     rmse_velocidade = np.sqrt(mean_squared_error(velocidade_true, velocidade_pred))
-#     r2_posicao = r2_score(posicao_true, posicao_pred)
-#     r2_velocidade = r2_score(velocidade_true, velocidade_pred)
-    
-#     fig.update_layout(
-#         title=dict(
-#             text=f"<span style='font-size:20px; font-weight:bold;'>{titulo}</span><br><br>" +
-#                  f"<span style='font-size:20px; color:#555555;'>" +
-#                  f"<sup>RMSE Posição: {rmse_posicao:.4f} | RMSE Velocidade: {rmse_velocidade:.4f}</sup><br>" +
-#                  f"<sup>R² Posição: {r2_posicao:.4f} | R² Velocidade: {r2_velocidade:.4f}</sup>",
-#             x=0.45,
-#             y=0.97,
-#             font=dict(size=16)
-#         ),
-#         width=1400,
-#         height=700,
-#         showlegend=True,
-#         legend=dict(
-#             title="Legenda",
-#             x=1.02,
-#             y=0.5,
-#             xanchor='left',
-#             yanchor='middle',
-#             bgcolor='rgba(255, 255, 255, 0.9)',
-#             bordercolor='black',
-#             borderwidth=1,
-#             font=dict(size=16),
-#             itemclick="toggle",
-#             itemdoubleclick="toggleothers"
-#         ),
-#         hovermode='closest',
-#         plot_bgcolor='white',
-#         margin=dict(t=150)
-#     )
-    
-#     return fig
+def cria_grafico_distribuicao_espacial(
+    x_train, y_train, z_train,
+    x_val,   y_val,   z_val,
+    x_test,  y_test,  z_test,
+    titulo="Distribuição Espacial dos Pontos - Equação de Poisson 3D (por ponto)"
+):
+    """
+    Cria gráfico 3D mostrando a distribuição espacial dos pontos de colocação
+    para treino, validação e teste.
 
-# def cria_grafico_previsoes_espaco_fases(
-#     y_pos_true, y_vel_true,
-#     y_pos_pred, y_vel_pred,
-#     titulo="Previsões do Modelo no Espaço de Fases - Oscilador de Van der Pol"
-# ):
-#     """
-#     Cria gráfico 2D mostrando as previsões do modelo no espaço de fases.
-#     Para trajetórias completas, os dados são achatados para visualização pontual.
-    
-#     Args:
-#         y_pos_true: Posições reais
-#         y_vel_true: Velocidades reais
-#         y_pos_pred: Posições previstas
-#         y_vel_pred: Velocidades previstas
-#         titulo: Título do gráfico
-        
-#     Returns:
-#         Figura Plotly
-#     """
-#     fig = go.Figure()
-    
-#     # achata as trajetórias para visualização pontual
-#     if y_pos_true.ndim > 1:
-#         y_pos_true_flat = y_pos_true.flatten()
-#         y_vel_true_flat = y_vel_true.flatten()
-#         y_pos_pred_flat = y_pos_pred.flatten()
-#         y_vel_pred_flat = y_vel_pred.flatten()
-#     else:
-#         y_pos_true_flat = y_pos_true
-#         y_vel_true_flat = y_vel_true
-#         y_pos_pred_flat = y_pos_pred
-#         y_vel_pred_flat = y_vel_pred
-    
-#     # previsões do modelo
-#     fig.add_trace(go.Scatter(
-#         x=y_pos_pred_flat,
-#         y=y_vel_pred_flat,
-#         mode='markers',
-#         name='MLP',
-#         marker=dict(
-#             color='#BF360C',
-#             size=3,
-#             opacity=0.6,
-#             symbol='diamond'
-#         ),
-#         hovertemplate=(
-#             f"<b>MLP</b><br>" +
-#             f"Posição: %{{x:.3f}}<br>" +
-#             f"Velocidade: %{{y:.3f}}<br>" +
-#             f"<extra></extra>"
-#         )
-#     ))
+    Args:
+        x_train, y_train, z_train: Coordenadas dos pontos de treino
+        x_val,   y_val,   z_val:   Coordenadas dos pontos de validação
+        x_test,  y_test,  z_test:  Coordenadas dos pontos de teste
+        titulo: Título do gráfico
 
-#     # dados reais
-#     fig.add_trace(go.Scatter(
-#         x=y_pos_true_flat,
-#         y=y_vel_true_flat,
-#         mode='markers',
-#         name='Dados de Teste',
-#         marker=dict(
-#             color='#1A237E',
-#             size=3,
-#             opacity=0.6,
-#             symbol='circle'
-#         ),
-#         hovertemplate=(
-#             f"<b>Dados de Teste</b><br>" +
-#             f"Posição: %{{x:.3f}}<br>" +
-#             f"Velocidade: %{{y:.3f}}<br>" +
-#             f"<extra></extra>"
-#         )
-#     ))
+    Returns:
+        Figura Plotly
+    """
+    fig = go.Figure()
 
-#     rmse_posicao = np.sqrt(mean_squared_error(y_pos_true_flat, y_pos_pred_flat))
-#     rmse_velocidade = np.sqrt(mean_squared_error(y_vel_true_flat, y_vel_pred_flat))
-#     r2_posicao = r2_score(y_pos_true_flat, y_pos_pred_flat)
-#     r2_velocidade = r2_score(y_vel_true_flat, y_vel_pred_flat)
-    
-#     fig.update_layout(
-#         title=dict(
-#             text=f"<span style='font-size:20px; font-weight:bold;'>{titulo}</span><br><br>" +
-#                  f"<span style='font-size:20px; color:#555555;'>" +
-#                  f"<sup>RMSE Posição: {rmse_posicao:.4f} | RMSE Velocidade: {rmse_velocidade:.4f}</sup><br>" +
-#                  f"<sup>R² Posição: {r2_posicao:.4f} | R² Velocidade: {r2_velocidade:.4f}</sup>",
-#             x=0.5,
-#             y=0.95,
-#             font=dict(size=16)
-#         ),
-#         xaxis_title="Posição",
-#         yaxis_title="Velocidade",
-#         width=1400,
-#         height=1000,
-#         legend=dict(
-#             title="Legenda",
-#             x=0.95,
-#             y=0.95,
-#             bgcolor='rgba(255, 255, 255, 0.9)',
-#             bordercolor='black',
-#             borderwidth=1,
-#             font=dict(size=14),
-#             itemclick="toggle",
-#             itemdoubleclick="toggleothers"
-#         ),
-#         hovermode='closest',
-#         plot_bgcolor='white',
-#         paper_bgcolor='white',
-#         margin=dict(t=150),
-#         xaxis=dict(
-#             showgrid=False,
-#             gridcolor='darkgray',
-#             zeroline=True,
-#             zerolinecolor='darkgray',
-#             zerolinewidth=1,
-#             title_font=dict(size=16),
-#             tickfont=dict(size=16)
-#         ),
-#         yaxis=dict(
-#             showgrid=False,
-#             gridcolor='darkgray',
-#             zeroline=True,
-#             zerolinecolor='darkgray',
-#             zerolinewidth=1,
-#             title_font=dict(size=16),
-#             tickfont=dict(size=16)
-#         )
-#     )
-    
-#     return fig
+    x_train_flat = x_train.flatten() if x_train.ndim > 1 else x_train
+    y_train_flat = y_train.flatten() if y_train.ndim > 1 else y_train
+    z_train_flat = z_train.flatten() if z_train.ndim > 1 else z_train
 
+    x_val_flat = x_val.flatten() if x_val.ndim > 1 else x_val
+    y_val_flat = y_val.flatten() if y_val.ndim > 1 else y_val
+    z_val_flat = z_val.flatten() if z_val.ndim > 1 else z_val
+
+    x_test_flat = x_test.flatten() if x_test.ndim > 1 else x_test
+    y_test_flat = y_test.flatten() if y_test.ndim > 1 else y_test
+    z_test_flat = z_test.flatten() if z_test.ndim > 1 else z_test
+
+    # treino
+    fig.add_trace(go.Scatter3d(
+        x=x_train_flat,
+        y=y_train_flat,
+        z=z_train_flat,
+        mode='markers',
+        name='Dados de Treino (70%)',
+        marker=dict(
+            color='#2E7D32',
+            size=3,
+            opacity=0.9,
+            symbol='circle'
+        ),
+        hovertemplate=(
+            "<b>Dados de Treino</b><br>" +
+            "x: %{x:.3f}<br>" +
+            "y: %{y:.3f}<br>" +
+            "z: %{z:.3f}<br>" +
+            "<extra></extra>"
+        )
+    ))
+
+    # validação
+    fig.add_trace(go.Scatter3d(
+        x=x_val_flat,
+        y=y_val_flat,
+        z=z_val_flat,
+        mode='markers',
+        name='Dados de Validação (20%)',
+        marker=dict(
+            color='#0D47A1',
+            size=3,
+            opacity=0.9,
+            symbol='circle'
+        ),
+        hovertemplate=(
+            "<b>Dados de Validação</b><br>" +
+            "x: %{x:.3f}<br>" +
+            "y: %{y:.3f}<br>" +
+            "z: %{z:.3f}<br>" +
+            "<extra></extra>"
+        )
+    ))
+
+    # teste
+    fig.add_trace(go.Scatter3d(
+        x=x_test_flat,
+        y=y_test_flat,
+        z=z_test_flat,
+        mode='markers',
+        name='Dados de Teste (10%)',
+        marker=dict(
+            color='#F57F17',
+            size=3,
+            opacity=0.9,
+            symbol='circle'
+        ),
+        hovertemplate=(
+            "<b>Dados de Teste</b><br>" +
+            "x: %{x:.3f}<br>" +
+            "y: %{y:.3f}<br>" +
+            "z: %{z:.3f}<br>" +
+            "<extra></extra>"
+        )
+    ))
+
+    n_train = len(x_train_flat)
+    n_val   = len(x_val_flat)
+    n_test  = len(x_test_flat)
+    total   = n_train + n_val + n_test
+
+    fig.update_layout(
+        title=dict(
+            text=f"<span style='font-size:20px; font-weight:bold;'>{titulo}</span><br><br>" +
+                 f"<span style='font-size:20px; color:#555555;'>" +
+                 f"<sup>Treino: {n_train} ({n_train/total*100:.1f}%) | " +
+                 f"Validação: {n_val} ({n_val/total*100:.1f}%) | " +
+                 f"Teste: {n_test} ({n_test/total*100:.1f}%)</sup>",
+            x=0.50,
+            y=0.95,
+            font=dict(size=20)
+        ),
+        scene=dict(
+            xaxis_title="x",
+            yaxis_title="y",
+            zaxis_title="z",
+            xaxis=dict(title_font=dict(size=16), tickfont=dict(size=14)),
+            yaxis=dict(title_font=dict(size=16), tickfont=dict(size=14)),
+            zaxis=dict(title_font=dict(size=16), tickfont=dict(size=14)),
+            aspectmode="cube",
+        ),
+        width=1400,
+        height=1000,
+        legend=dict(
+            title="Legenda",
+            x=0.85,
+            y=0.98,
+            bgcolor='rgba(255, 255, 255, 0.9)',
+            bordercolor='black',
+            borderwidth=1,
+            font=dict(size=16),
+            itemclick="toggle",
+            itemdoubleclick="toggleothers"
+        ),
+        hovermode='closest',
+        plot_bgcolor='white',
+        margin=dict(t=150),
+    )
+
+    return fig
+
+def cria_grafico_historico_treinamento(
+    history: Dict,
+    titulo: str = "Evolução da Função de Custo durante o Treinamento - Equação de Poisson 3D"
+) -> go.Figure:
+    """
+    Cria gráfico da evolução das funções de custo de treino e validação ao longo das épocas.
+
+    Args:
+        history: Dicionário contendo 'train_loss' e 'val_loss'
+        titulo: Título do gráfico
+
+    Returns:
+        Figura Plotly
+    """
+
+    epochs = list(range(1, len(history['train_loss']) + 1))
+
+    fig = go.Figure()
+
+    # função de custo de treino
+    fig.add_trace(go.Scatter(
+        x=epochs,
+        y=history['train_loss'],
+        mode='lines',
+        name='Loss de Treino',
+        line=dict(color='#2E7D32', width=2),
+        hovertemplate=(
+            "<b>Loss de Treino</b><br>" +
+            "Época: %{x}<br>" +
+            "Loss: %{y:.6f}<br>" +
+            "<extra></extra>"
+        )
+    ))
+
+    # loss de validação
+    fig.add_trace(go.Scatter(
+        x=epochs,
+        y=history['val_loss'],
+        mode='lines',
+        name='Loss de Validação',
+        line=dict(color='#B71C1C', width=2),
+        hovertemplate=(
+            "<b>Loss de Validação</b><br>" +
+            "Época: %{x}<br>" +
+            "Loss: %{y:.6f}<br>" +
+            "<extra></extra>"
+        )
+    ))
+
+    fig.update_layout(
+        title=dict(
+            text=f"<span style='font-size:20px; font-weight:bold;'>{titulo}</span><br><br>",
+            x=0.5,
+            y=0.95,
+            font=dict(size=16)
+        ),
+        xaxis_title="Época",
+        yaxis_title="Função de Custo (MSE)",
+        width=1400,
+        height=800,
+        legend=dict(
+            title="Legenda",
+            x=0.85,
+            y=0.95,
+            xanchor='left',
+            yanchor='top',
+            bgcolor='rgba(255, 255, 255, 0.95)',
+            bordercolor='gray',
+            borderwidth=1,
+            font=dict(size=14),
+            itemclick="toggle",
+            itemdoubleclick="toggleothers"
+        ),
+        hovermode='closest',
+        plot_bgcolor='white',
+        paper_bgcolor='white',
+        margin=dict(t=150, b=80, l=80, r=80),
+        xaxis=dict(
+            showgrid=True,
+            gridcolor='lightgray',
+            gridwidth=0.5,
+            zeroline=True,
+            zerolinecolor='lightgray',
+            zerolinewidth=1,
+            title_font=dict(size=16),
+            tickfont=dict(size=14)
+        ),
+        yaxis=dict(
+            showgrid=True,
+            gridcolor='lightgray',
+            gridwidth=0.5,
+            zeroline=True,
+            zerolinecolor='lightgray',
+            zerolinewidth=1,
+            title_font=dict(size=16),
+            tickfont=dict(size=14),
+            type='log'
+        )
+    )
+
+    return fig
+
+
+def cria_grafico_real_previsto_mlp(
+    predictions,
+    y_true,
+    titulo="Previsões do Modelo MLP - Equação de Poisson 3D"
+):
+    """
+    Cria gráfico de dispersão para visualizar as previsões do modelo MLP.
+    Os dados são achatados para visualização ponto a ponto (cada ponto da
+    malha é uma amostra).
+
+    Args:
+        predictions: array com as previsões φ(x,y,z) por ponto
+        y_true: array com os valores de referência φ(x,y,z) por ponto
+        titulo: título do gráfico
+
+    Returns:
+        Figura Plotly
+    """
+    # achata para visualização pontual
+    y_pred_flat = predictions.flatten() if predictions.ndim > 1 else predictions
+    y_true_flat = y_true.flatten()     if y_true.ndim     > 1 else y_true
+
+    fig = go.Figure()
+
+    # dispersão real vs. previsto
+    fig.add_trace(go.Scatter(
+        x=y_true_flat,
+        y=y_pred_flat,
+        mode='markers',
+        name='φ',
+        marker=dict(
+            color='#BF360C',
+            size=3,
+            opacity=0.5,
+            symbol='circle'
+        ),
+        hovertemplate=(
+            "<b>φ</b><br>" +
+            "Real: %{x:.3e}<br>" +
+            "Previsto: %{y:.3e}<br>" +
+            "<extra></extra>"
+        )
+    ))
+
+    # linha y = x (referência)
+    min_val = float(min(y_true_flat.min(), y_pred_flat.min()))
+    max_val = float(max(y_true_flat.max(), y_pred_flat.max()))
+
+    fig.add_trace(go.Scatter(
+        x=[min_val, max_val],
+        y=[min_val, max_val],
+        mode='lines',
+        name='Referência (y=x)',
+        line=dict(color='#1B5E20', width=2, dash='dot'),
+        hovertemplate='Referência: %{x:.3e}<extra></extra>'
+    ))
+
+    rmse = np.sqrt(mean_squared_error(y_true_flat, y_pred_flat))
+    r2   = r2_score(y_true_flat, y_pred_flat)
+
+    fig.update_layout(
+        title=dict(
+            text=f"<span style='font-size:20px; font-weight:bold;'>{titulo}</span><br><br>" +
+                 f"<span style='font-size:20px; color:#555555;'>" +
+                 f"<sup>RMSE: {rmse:.4e} | R²: {r2:.4f}</sup>",
+            x=0.5,
+            y=0.95,
+            font=dict(size=16)
+        ),
+        xaxis_title="φ Real [V]",
+        yaxis_title="φ Previsto [V]",
+        width=1400,
+        height=1000,
+        legend=dict(
+            title="Legenda",
+            x=0.95,
+            y=0.95,
+            bgcolor='rgba(255, 255, 255, 0.9)',
+            bordercolor='black',
+            borderwidth=1,
+            font=dict(size=14),
+            itemclick="toggle",
+            itemdoubleclick="toggleothers"
+        ),
+        hovermode='closest',
+        plot_bgcolor='white',
+        paper_bgcolor='white',
+        margin=dict(t=150),
+        xaxis=dict(
+            showgrid=False,
+            gridcolor='darkgray',
+            zeroline=True,
+            zerolinecolor='darkgray',
+            zerolinewidth=1,
+            title_font=dict(size=16),
+            tickfont=dict(size=16)
+        ),
+        yaxis=dict(
+            showgrid=False,
+            gridcolor='darkgray',
+            zeroline=True,
+            zerolinecolor='darkgray',
+            zerolinewidth=1,
+            title_font=dict(size=16),
+            tickfont=dict(size=16),
+            scaleanchor="x",
+            scaleratio=1,
+        )
+    )
+
+    return fig
+
+
+def cria_grafico_previsoes_espaco_fases(
+    y_true,
+    y_pred,
+    titulo="Previsões do Modelo - Equação de Poisson 3D"
+):
+    """
+    Cria gráfico de dispersão comparando o potencial elétrico φ(x,y,z) previsto
+    pelo modelo com o de referência, ponto a ponto.
+
+    Args:
+        y_true: Valores de referência de φ(x,y,z) (achatados)
+        y_pred: Valores previstos de φ(x,y,z) (achatados)
+        titulo: Título do gráfico
+
+    Returns:
+        Figura Plotly
+    """
+    y_true_flat = np.asarray(y_true).flatten()
+    y_pred_flat = np.asarray(y_pred).flatten()
+
+    fig = go.Figure()
+
+    # previsões do modelo
+    fig.add_trace(go.Scatter(
+        x=y_true_flat,
+        y=y_pred_flat,
+        mode='markers',
+        name='MLP',
+        marker=dict(
+            color='#BF360C',
+            size=3,
+            opacity=0.6,
+            symbol='diamond'
+        ),
+        hovertemplate=(
+            "<b>MLP</b><br>" +
+            "φ Real: %{x:.3e}<br>" +
+            "φ Previsto: %{y:.3e}<br>" +
+            "<extra></extra>"
+        )
+    ))
+
+    # linha y=x (referência)
+    min_val = float(min(y_true_flat.min(), y_pred_flat.min()))
+    max_val = float(max(y_true_flat.max(), y_pred_flat.max()))
+
+    fig.add_trace(go.Scatter(
+        x=[min_val, max_val],
+        y=[min_val, max_val],
+        mode='lines',
+        name='Referência (y=x)',
+        line=dict(color='#1B5E20', width=2, dash='dot'),
+        hovertemplate='Referência: %{x:.3e}<extra></extra>'
+    ))
+
+    rmse = np.sqrt(mean_squared_error(y_true_flat, y_pred_flat))
+    r2   = r2_score(y_true_flat, y_pred_flat)
+
+    fig.update_layout(
+        title=dict(
+            text=f"<span style='font-size:20px; font-weight:bold;'>{titulo}</span><br><br>" +
+                 f"<span style='font-size:20px; color:#555555;'>" +
+                 f"<sup>RMSE: {rmse:.4e} | R²: {r2:.4f}</sup>",
+            x=0.5,
+            y=0.95,
+            font=dict(size=16)
+        ),
+        xaxis_title="φ Real [V]",
+        yaxis_title="φ Previsto [V]",
+        width=1400,
+        height=1000,
+        legend=dict(
+            title="Legenda",
+            x=0.95,
+            y=0.95,
+            bgcolor='rgba(255, 255, 255, 0.9)',
+            bordercolor='black',
+            borderwidth=1,
+            font=dict(size=14),
+            itemclick="toggle",
+            itemdoubleclick="toggleothers"
+        ),
+        hovermode='closest',
+        plot_bgcolor='white',
+        paper_bgcolor='white',
+        margin=dict(t=150),
+        xaxis=dict(
+            showgrid=False,
+            gridcolor='darkgray',
+            zeroline=True,
+            zerolinecolor='darkgray',
+            zerolinewidth=1,
+            title_font=dict(size=16),
+            tickfont=dict(size=16)
+        ),
+        yaxis=dict(
+            showgrid=False,
+            gridcolor='darkgray',
+            zeroline=True,
+            zerolinecolor='darkgray',
+            zerolinewidth=1,
+            title_font=dict(size=16),
+            tickfont=dict(size=16),
+            scaleanchor="x",
+            scaleratio=1,
+        )
+    )
+
+    return fig
 
 # def cria_grafico_trajetorias_completas(
 #     posicoes_true, velocidades_true,
