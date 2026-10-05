@@ -104,7 +104,7 @@ def cria_grafico_2d(solucao):
                 "φ = %{z:.3e}<br>"
                 "<extra></extra>"
             ),
-            colorbar=dict(title="φ(x,y) [V]", x=1.02, len=0.75) if visivel else None,
+            colorbar=dict(title="Potencial Elétrico φ(x,y) [V]", x=1.02, len=0.75) if visivel else None,
         ))
 
     botoes = []
@@ -216,7 +216,7 @@ def cria_grafico_3d(solucao):
                 f"x = {x[kx]:.3f}<br>"
                 "y = %{y:.3f}<br>"
                 "z = %{z:.3f}<br>"
-                "φ = %{surfacecolor:.3e}<br>"
+                "Potencial Elétrico φ(x,y,z) = %{surfacecolor:.3e}<br>"
                 "<extra></extra>"
             ),
         ))
@@ -240,7 +240,7 @@ def cria_grafico_3d(solucao):
                 "x = %{x:.3f}<br>"
                 f"y = {y[ky]:.3f}<br>"
                 "z = %{z:.3f}<br>"
-                "φ = %{surfacecolor:.3e}<br>"
+                "Potencial Elétrico φ(x,y,z) = %{surfacecolor:.3e}<br>"
                 "<extra></extra>"
             ),
         ))
@@ -254,7 +254,7 @@ def cria_grafico_3d(solucao):
             colorscale=escala,
             cmin=phi.min(), cmax=phi.max(),
             showscale=visivel,
-            colorbar=dict(title="φ(x,y,z) [V]", x=1.02, len=0.75) if visivel else None,
+            colorbar=dict(title="Potencial Elétrico φ(x,y,z) [V]", x=1.02, len=0.75) if visivel else None,
             opacity=0.95,
             name=f"Carga {i_carga} (z = {z[kz]:.2f})",
             visible=visivel,
@@ -265,7 +265,7 @@ def cria_grafico_3d(solucao):
                 "x = %{x:.3f}<br>"
                 "y = %{y:.3f}<br>"
                 f"z = {z[kz]:.3f}<br>"
-                "φ = %{surfacecolor:.3e}<br>"
+                "Potencial Elétrico φ(x,y,z) = %{surfacecolor:.3e}<br>"
                 "<extra></extra>"
             ),
         ))
@@ -847,7 +847,7 @@ def cria_grafico_real_previsto_mlp(
         x=y_true_flat,
         y=y_pred_flat,
         mode='markers',
-        name='φ',
+        name='Potencial Elétrico φ(x,y,z)',
         marker=dict(
             color='#BF360C',
             size=3,
@@ -855,7 +855,7 @@ def cria_grafico_real_previsto_mlp(
             symbol='circle'
         ),
         hovertemplate=(
-            "<b>φ</b><br>" +
+            "<b>Potencial Elétrico φ(x,y,z)</b><br>" +
             "Real: %{x:.3e}<br>" +
             "Previsto: %{y:.3e}<br>" +
             "<extra></extra>"
@@ -887,8 +887,8 @@ def cria_grafico_real_previsto_mlp(
             y=0.95,
             font=dict(size=16)
         ),
-        xaxis_title="φ Real [V]",
-        yaxis_title="φ Previsto [V]",
+        xaxis_title="Potencial Elétrico φ Real [V]",
+        yaxis_title="Potencial Elétrico φ Previsto [V]",
         width=1400,
         height=1000,
         legend=dict(
@@ -958,7 +958,7 @@ def cria_grafico_previsoes_espaco_fases(
         x=y_true_flat,
         y=y_pred_flat,
         mode='markers',
-        name='MLP',
+        name='Potencial Elétrico φ(x,y,z) MLP',
         marker=dict(
             color='#BF360C',
             size=3,
@@ -966,9 +966,9 @@ def cria_grafico_previsoes_espaco_fases(
             symbol='diamond'
         ),
         hovertemplate=(
-            "<b>MLP</b><br>" +
-            "φ Real: %{x:.3e}<br>" +
-            "φ Previsto: %{y:.3e}<br>" +
+            "<b>Potencial Elétrico φ(x,y,z)</b><br>" +
+            "Potencial Elétrico φ(x,y,z) Real: %{x:.3e}<br>" +
+            "Potencial Elétrico φ(x,y,z) Previsto: %{y:.3e}<br>" +
             "<extra></extra>"
         )
     ))
@@ -998,8 +998,8 @@ def cria_grafico_previsoes_espaco_fases(
             y=0.95,
             font=dict(size=16)
         ),
-        xaxis_title="φ Real [V]",
-        yaxis_title="φ Previsto [V]",
+        xaxis_title="Potencial Elétrico Real [V]",
+        yaxis_title="Potencial Elétrico Previsto [V]",
         width=1400,
         height=1000,
         legend=dict(

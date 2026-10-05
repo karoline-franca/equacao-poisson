@@ -1,16 +1,25 @@
 simulation:
   n_cargas: 1
 
-densidade_carga:
-  tipo: senoide
-  parametros:
-    amplitude_fator: 7.402203300817018     # A = fator × ε₀  (fator = 3π²/4)
-    n: 1
-    m: 1
-    l: 1
-
 intervals:
   parametro_eps0: 8.8541878128e-12
+
+densidade_carga:
+  # tipo: senoide
+  # parametros:
+  #   amplitude_fator: 7.402203300817018     # A = fator × ε₀  (fator = 3π²/4)
+  #   n: 1
+  #   m: 1
+  #   l: 1
+
+  tipo: gaussiana_dupla
+  parametros:
+    A1: 1.0e-10
+    A2: -0.8e-10
+    sigma1: 0.15
+    sigma2: 0.10
+    c1: [0.3, -0.2, 0.4]
+    c2: [-0.4, 0.3, -0.2]
 
 solver:
   N: 20
