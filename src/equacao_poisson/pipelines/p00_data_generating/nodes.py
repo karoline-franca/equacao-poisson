@@ -59,7 +59,17 @@ def constroi_densidade_carga(row, eps0, dom) -> Callable:
     Ly = ymax - ymin
     Lz = zmax - zmin
 
-    if tipo == 'gaussiana':
+    if tipo == 'senoide':
+        amp = row.amplitude_fator * eps0 if row.amplitude_fator is not None else row.amplitude
+        n, m, l = row.n, row.m, row.l
+        def rho(Xg, Yg, Zg):
+            sx = np.sin(n * np.pi * (Xg - xmin) / Lx)
+            sy = np.sin(m * np.pi * (Yg - ymin) / Ly)
+            sz = np.sin(l * np.pi * (Zg - zmin) / Lz)
+            return amp * sx * sy * sz
+        return rho
+
+    elif tipo == 'gaussiana':
         amp, larg = row.amplitude, row.largura
         c = np.asarray(row.c1 if hasattr(row, 'c1') and row.c1 is not None else [row.centro_x, row.centro_y, row.centro_z])
         def rho(Xg, Yg, Zg):
@@ -80,24 +90,16 @@ def constroi_densidade_carga(row, eps0, dom) -> Callable:
             return g1 + g2
         return rho
 
-    elif tipo == 'senoide':
-        amp = row.amplitude_fator * eps0 if row.amplitude_fator is not None else row.amplitude
-        n, m, l = row.n, row.m, row.l
-        def rho(Xg, Yg, Zg):
-            sx = np.sin(n * np.pi * (Xg - xmin) / Lx)
-            sy = np.sin(m * np.pi * (Yg - ymin) / Ly)
-            sz = np.sin(l * np.pi * (Zg - zmin) / Lz)
-            return amp * sx * sy * sz
-        return rho
-
-    elif tipo == 'polinomial':
+    elif tipo == 'kink':
         amp = row.amplitude
-        n, m, l = row.n, row.m, row.l
+        k   = row.k
+        x0  = row.x0
         def rho(Xg, Yg, Zg):
-            ux = (Xg - xmin) / Lx
-            uy = (Yg - ymin) / Ly
-            uz = (Zg - zmin) / Lz
-            return amp * (ux**n) * (uy**m) * (uz**l)
+            s = k * (Xg - x0)
+            softplus = np.log1p(np.exp(-np.abs(s))) + np.maximum(s, 0.0)
+            return amp * softplus \
+                * np.sin(np.pi * (Yg - ymin) / Ly) \
+                * np.sin(np.pi * (Zg - zmin) / Lz)
         return rho
 
     else:

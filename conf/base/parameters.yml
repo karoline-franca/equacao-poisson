@@ -20,14 +20,20 @@ densidade_carga:
   #   centro_y: -0.2
   #   centro_z: 0.4
 
-  tipo: gaussiana_dupla
+  # tipo: gaussiana_dupla
+  # parametros:
+  #   A1: 100.0e-10
+  #   A2: -100.0e-10
+  #   sigma1: 0.15
+  #   sigma2: 0.10
+  #   c1: [0.3, -0.2, 0.4]
+  #   c2: [-0.4, 0.3, -0.2]
+
+  tipo: kink
   parametros:
-    A1: 100.0e-10
-    A2: -100.0e-10
-    sigma1: 0.15
-    sigma2: 0.10
-    c1: [0.3, -0.2, 0.4]
-    c2: [-0.4, 0.3, -0.2]
+    amplitude: 100.0e-8
+    k: 30.0
+    x0: 0.0
 
 solver:
   N: 20
