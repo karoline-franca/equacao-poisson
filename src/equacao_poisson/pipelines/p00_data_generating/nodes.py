@@ -16,23 +16,19 @@ def le_distribuicao_carga_node(parameters: Dict[str, Any]) -> pd.DataFrame:
     """
     Lê a distribuição de carga definida explicitamente no parameters.yml.
     Não sorteia nada — apenas empacota a configuração em um DataFrame.
-    """
-    cfg     = parameters['densidade_carga']
-    tipo    = cfg['tipo']
-    params  = cfg['parametros']
 
-    return pd.DataFrame([{
-        'tipo':       tipo,
-        'amplitude':  params.get('amplitude'),
-        'amplitude_fator': params.get('amplitude_fator'),
-        'largura':    params.get('largura'),
-        'centro_x':   params.get('centro_x'),
-        'centro_y':   params.get('centro_y'),
-        'centro_z':   params.get('centro_z'),
-        'n':          params.get('n'),
-        'm':          params.get('m'),
-        'l':          params.get('l'),
-    }])
+    Genérico: repassa todas as chaves de 'parametros' como colunas, sem
+    precisar conhecer cada tipo de densidade de carga.
+    """
+    cfg    = parameters['densidade_carga']
+    tipo   = cfg['tipo']
+    params = cfg['parametros']
+
+    # repassa o tipo + todas as chaves de parametros como colunas
+    linha = {'tipo': tipo}
+    linha.update(params)
+
+    return pd.DataFrame([linha])
 
 
 def constroi_densidade_carga(row, eps0, dom) -> Callable:
@@ -65,20 +61,20 @@ def constroi_densidade_carga(row, eps0, dom) -> Callable:
 
     if tipo == 'gaussiana':
         amp, larg = row.amplitude, row.largura
-        cx, cy, cz = row.centro_x, row.centro_y, row.centro_z
+        c = np.asarray(row.c1 if hasattr(row, 'c1') and row.c1 is not None else [row.centro_x, row.centro_y, row.centro_z])
         def rho(Xg, Yg, Zg):
-            r2 = (Xg - cx)**2 + (Yg - cy)**2 + (Zg - cz)**2
+            r2 = (Xg - c[0])**2 + (Yg - c[1])**2 + (Zg - c[2])**2
             return amp * np.exp(-r2 / (2.0 * larg**2))
         return rho
 
     elif tipo == 'gaussiana_dupla':
         A1, A2 = row.A1, row.A2
         sigma1, sigma2 = row.sigma1, row.sigma2
-        c1x, c1y, c1z = row.c1
-        c2x, c2y, c2z = row.c2
+        c1 = np.asarray(row.c1, dtype=float)
+        c2 = np.asarray(row.c2, dtype=float)
         def rho(Xg, Yg, Zg):
-            r2_1 = (Xg - c1x)**2 + (Yg - c1y)**2 + (Zg - c1z)**2
-            r2_2 = (Xg - c2x)**2 + (Yg - c2y)**2 + (Zg - c2z)**2
+            r2_1 = (Xg - c1[0])**2 + (Yg - c1[1])**2 + (Zg - c1[2])**2
+            r2_2 = (Xg - c2[0])**2 + (Yg - c2[1])**2 + (Zg - c2[2])**2
             g1 = A1 * np.exp(-r2_1 / (2.0 * sigma1**2))
             g2 = A2 * np.exp(-r2_2 / (2.0 * sigma2**2))
             return g1 + g2

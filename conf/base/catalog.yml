@@ -3,26 +3,8 @@
 # ============================================================
 
 distribuicoes_carga:
-  type: pandas.CSVDataset
-  filepath: data/02_intermediate/${runtime_params:data_version,default_v1}/distribuicoes_carga.csv
-  load_args:
-    sep: ';'
-    encoding: 'latin-1'
-  save_args:
-    index: False
-    sep: ';'
-    encoding: 'latin-1'
-
-parametros_eletrostatico:
-  type: pandas.CSVDataset
-  filepath: data/02_intermediate/${runtime_params:data_version,default_v1}/parametros_eletrostatico.csv
-  load_args:
-    sep: ';'
-    encoding: 'latin-1'
-  save_args:
-    index: False
-    sep: ';'
-    encoding: 'latin-1'
+  type: pickle.PickleDataset
+  filepath: data/02_intermediate/${runtime_params:data_version,default_v1}/distribuicoes_carga.pkl
 
 solucao_espectral:
   type: pickle.PickleDataset

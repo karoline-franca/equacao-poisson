@@ -12,22 +12,22 @@ densidade_carga:
   #   m: 1
   #   l: 1
 
-  tipo: gaussiana
-  parametros:
-    amplitude: 100.0e-10
-    largura: 0.15
-    centro_x: 0.3
-    centro_y: -0.2
-    centro_z: 0.4
-
-  # tipo: gaussiana_dupla
+  # tipo: gaussiana
   # parametros:
-  #   A1: 1.0e-10
-  #   A2: -0.8e-10
-  #   sigma1: 0.15
-  #   sigma2: 0.10
-  #   c1: [0.3, -0.2, 0.4]
-  #   c2: [-0.4, 0.3, -0.2]
+  #   amplitude: 100.0e-10
+  #   largura: 0.15
+  #   centro_x: 0.3
+  #   centro_y: -0.2
+  #   centro_z: 0.4
+
+  tipo: gaussiana_dupla
+  parametros:
+    A1: 100.0e-10
+    A2: -100.0e-10
+    sigma1: 0.15
+    sigma2: 0.10
+    c1: [0.3, -0.2, 0.4]
+    c2: [-0.4, 0.3, -0.2]
 
 solver:
   N: 20
