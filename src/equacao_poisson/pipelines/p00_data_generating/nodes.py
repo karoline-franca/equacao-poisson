@@ -35,36 +35,13 @@ def le_distribuicao_carga_node(parameters: Dict[str, Any]) -> pd.DataFrame:
     }])
 
 
-def gera_parametros_eletrostatico_node(parameters: Dict[str, Any]) -> pd.DataFrame:
-    """
-    Gera parâmetros do sistema eletrostático (ε₀).
-    """
-    eps0 = parameters['intervals']['parametro_eps0']
-
-    if eps0 < 1e-12:
-        desc_eps0 = "Acoplamento forte (ε₀ muito pequeno)"
-    elif eps0 < 1e-11:
-        desc_eps0 = "Acoplamento moderado"
-    elif eps0 < 1e-10:
-        desc_eps0 = "Acoplamento fraco"
-    else:
-        desc_eps0 = "Acoplamento muito fraco (ε₀ grande)"
-
-    descricao = f"eps0={eps0:.3e}, {desc_eps0}"
-
-    return pd.DataFrame({
-        'descricao_sistema': [descricao],
-        'classificacao_eps0': [desc_eps0]
-    })
-
-
-def _constroi_densidade_carga(row, eps0, dom) -> Callable:
+def constroi_densidade_carga(row, eps0, dom) -> Callable:
     """
     Constrói a função ρ(x,y,z) a partir de uma linha do DataFrame de
     distribuições de carga. O tipo é definido no parameters.yml.
 
-    Para famílias que dependem do domínio (senoide), as coordenadas são
-    normalizadas para [0,1] usando os extremos do domínio físico, de modo
+    Para famílias que dependem do domínio (senoide, polinomial), as coordenadas
+    são normalizadas para [0,1] usando os extremos do domínio físico, de modo
     que a densidade se anule corretamente nas faces de [a,b]³.
 
     Args:
@@ -94,6 +71,19 @@ def _constroi_densidade_carga(row, eps0, dom) -> Callable:
             return amp * np.exp(-r2 / (2.0 * larg**2))
         return rho
 
+    elif tipo == 'gaussiana_dupla':
+        A1, A2 = row.A1, row.A2
+        sigma1, sigma2 = row.sigma1, row.sigma2
+        c1x, c1y, c1z = row.c1
+        c2x, c2y, c2z = row.c2
+        def rho(Xg, Yg, Zg):
+            r2_1 = (Xg - c1x)**2 + (Yg - c1y)**2 + (Zg - c1z)**2
+            r2_2 = (Xg - c2x)**2 + (Yg - c2y)**2 + (Zg - c2z)**2
+            g1 = A1 * np.exp(-r2_1 / (2.0 * sigma1**2))
+            g2 = A2 * np.exp(-r2_2 / (2.0 * sigma2**2))
+            return g1 + g2
+        return rho
+
     elif tipo == 'senoide':
         amp = row.amplitude_fator * eps0 if row.amplitude_fator is not None else row.amplitude
         n, m, l = row.n, row.m, row.l
@@ -108,7 +98,6 @@ def _constroi_densidade_carga(row, eps0, dom) -> Callable:
         amp = row.amplitude
         n, m, l = row.n, row.m, row.l
         def rho(Xg, Yg, Zg):
-            # normaliza para [0,1] em cada direção, depois eleva aos modos
             ux = (Xg - xmin) / Lx
             uy = (Yg - ymin) / Ly
             uz = (Zg - zmin) / Lz
@@ -120,7 +109,6 @@ def _constroi_densidade_carga(row, eps0, dom) -> Callable:
 
 def executa_simulacao_espectral_node(
     distribuicoes_carga: pd.DataFrame,
-    parametros_eletrostatico: pd.DataFrame,
     parameters: Dict[str, Any]
 ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     """
@@ -137,7 +125,7 @@ def executa_simulacao_espectral_node(
     def contorno_aterrado(Xg, Yg, Zg):
         return np.zeros_like(Xg)
 
-    densidades = [_constroi_densidade_carga(row, eps0, dom)
+    densidades = [constroi_densidade_carga(row, eps0, dom)
                   for row in distribuicoes_carga.itertuples()]
     contornos  = [contorno_aterrado] * len(densidades)
 
@@ -162,7 +150,6 @@ def executa_simulacao_espectral_node(
 
 def gera_base_consolidada_node(
     solucao: Dict[str, Any],
-    parametros_eletrostatico: pd.DataFrame,
 ) -> pd.DataFrame:
     """
     Constrói a base de dados consolidada com os campos de potencial e carga.
@@ -192,7 +179,6 @@ def gera_base_consolidada_node(
 
 def cria_visualizacoes_node(
     solucao: Dict[str, Any],
-    parametros_eletrostatico: pd.DataFrame
 ) -> None:
     """
     Cria visualizações 2D e 3D do potencial elétrico.
