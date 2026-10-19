@@ -107,7 +107,7 @@ input_dim:
 output_dim:
   type: MemoryDataset
 
-num_pontos:
+n_cargas:
   type: MemoryDataset
 
 cargas_train:
@@ -117,6 +117,15 @@ cargas_val:
   type: MemoryDataset
 
 cargas_test:
+  type: MemoryDataset
+
+params_train:
+  type: MemoryDataset
+
+params_val:
+  type: MemoryDataset
+
+params_test:
   type: MemoryDataset
 
 # base_interpolada_pontual:

@@ -1,5 +1,5 @@
 """
-Classe para resolver a equação de Poisson 3D em eletrostática usando o método
+Classe para resolver a equação de Poisson 2D em eletrostática usando o método
 pseudo-espectral de Galerkin-Colocação com polinômios de Chebyshev.
 A equação de Poisson em eletrostática descreve o potencial elétrico gerado por
 uma distribuição de carga ρ.
@@ -7,12 +7,12 @@ Sistema: ∇²φ = -ρ/ε₀,  φ = g em ∂Ω
 """
 
 import numpy as np
-from .me import PoissonSpectral3D
+from .me import PoissonSpectral2D
 
 
 class PoissonEletrostatico:
     """
-    Classe para resolver a equação de Poisson 3D em eletrostática usando o
+    Classe para resolver a equação de Poisson 2D em eletrostática usando o
     método pseudo-espectral de Galerkin-Colocação.
     """
 
@@ -28,15 +28,15 @@ class PoissonEletrostatico:
         self.n_sistemas = len(self.parametros_eps0)
 
         self.device = device
-        self.solver = PoissonSpectral3D(device=device)
+        self.solver = PoissonSpectral2D(device=device)
 
     def resolve(self, densidade_carga, condicao_contorno, params):
         """
         Resolve a equação de Poisson para uma ou várias distribuições de carga.
 
         Args:
-            densidade_carga: função ρ(x,y,z) OU lista de funções
-            condicao_contorno: função g(x,y,z) OU lista de funções (uma por carga)
+            densidade_carga: função ρ(x,y) OU lista de funções
+            condicao_contorno: função g(x,y) OU lista de funções (uma por carga)
             params: dicionário com 'N', 'dominio', 'eps0'
 
         Returns:
@@ -64,7 +64,6 @@ class PoissonEletrostatico:
             'cargas': cargas,
             'x': solucoes[0]['x'],
             'y': solucoes[0]['y'],
-            'z': solucoes[0]['z'],
             'N': solucoes[0]['N'],
             'dominio': solucoes[0]['dominio'],
             'residuos': residuos,

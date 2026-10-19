@@ -1,17 +1,17 @@
 """
-Classe para resolver a equação de Poisson 3D em eletrostática usando o método
+Classe para resolver a equação de Poisson 2D em eletrostática usando o método
 pseudo-espectral Galerkin-Colocação com polinômios de Chebyshev.
 """
 
 import numpy as np
 
 
-class PoissonSpectral3D:
+class PoissonSpectral2D:
     """
     Implementação do método pseudo-espectral Galerkin-Colocação para resolver
-    a equação de Poisson 3D em eletrostática:
+    a equação de Poisson 2D em eletrostática:
 
-        ∇²φ(x,y,z) = -ρ(x,y,z)/ε₀,   (x,y,z) ∈ Ω,
+        ∇²φ(x,y) = -ρ(x,y)/ε₀,   (x,y) ∈ Ω,
 
     com condições de contorno de Dirichlet gerais prescritas em ∂Ω.
     """
@@ -57,18 +57,18 @@ class PoissonSpectral3D:
 
     def solve(self, densidade_carga, condicao_contorno, params):
         """
-        Resolve a equação de Poisson 3D em eletrostática para uma dada distribuição
+        Resolve a equação de Poisson 2D em eletrostática para uma dada distribuição
         de carga e condições de contorno de Dirichlet gerais.
 
         Args:
-            densidade_carga (callable): Função que define a densidade de carga ρ(x,y,z).
-                            Deve ter assinatura: densidade_carga(Xg, Yg, Zg) -> ρ
+            densidade_carga (callable): Função que define a densidade de carga ρ(x,y).
+                            Deve ter assinatura: densidade_carga(Xg, Yg) -> ρ
             condicao_contorno (callable): Função que define o potencial prescrito em ∂Ω.
-                            Deve ter assinatura: condicao_contorno(Xg, Yg, Zg) -> g
+                            Deve ter assinatura: condicao_contorno(Xg, Yg) -> g
                             onde g é o valor de Dirichlet em cada ponto da malha.
             params (dict): Dicionário de parâmetros lido do parameters.yml, contendo:
                             - 'N'        : grau do polinômio (N+1 pontos por direção)
-                            - 'dominio'  : dict com xmin, xmax, ymin, ymax, zmin, zmax
+                            - 'dominio'  : dict com xmin, xmax, ymin, ymax
                             - 'eps0'     : permissividade do vácuo
 
         Returns:
@@ -81,36 +81,31 @@ class PoissonSpectral3D:
 
         xmin, xmax = dom['xmin'], dom['xmax']
         ymin, ymax = dom['ymin'], dom['ymax']
-        zmin, zmax = dom['zmin'], dom['zmax']
 
         xi_x, D2x = self._build_diff_matrix(N, xmin, xmax)
         xi_y, D2y = self._build_diff_matrix(N, ymin, ymax)
-        xi_z, D2z = self._build_diff_matrix(N, zmin, zmax)
 
         x = 0.5 * (xmin + xmax) + 0.5 * (xmax - xmin) * xi_x
         y = 0.5 * (ymin + ymax) + 0.5 * (ymax - ymin) * xi_y
-        z = 0.5 * (zmin + zmax) + 0.5 * (zmax - zmin) * xi_z
 
-        Xg, Yg, Zg = np.meshgrid(x, y, z, indexing="ij")
+        Xg, Yg = np.meshgrid(x, y, indexing="ij")
 
         # termo fonte: f = -ρ/ε₀
-        rho    = densidade_carga(Xg, Yg, Zg)
+        rho    = densidade_carga(Xg, Yg)
         f      = -rho / eps0
         f_flat = f.ravel(order="F")
 
-        # CC de Dirichlet: φ = g(x,y,z) em ∂Ω
-        g       = condicao_contorno(Xg, Yg, Zg)
+        # CC de Dirichlet: φ = g(x,y) em ∂Ω
+        g       = condicao_contorno(Xg, Yg)
         g_flat  = g.ravel(order="F")
 
         I    = np.eye(N + 1)
-        Lap  = (np.kron(np.kron(D2x, I), I)
-              + np.kron(np.kron(I, D2y), I)
-              + np.kron(np.kron(I, I), D2z))
+        Lap  = (np.kron(D2x, I)
+              + np.kron(I, D2y))
 
-        mask_bc = np.zeros((N + 1, N + 1, N + 1), dtype=bool)
-        mask_bc[0, :, :] = True;  mask_bc[-1, :, :] = True
-        mask_bc[:, 0, :] = True;  mask_bc[:, -1, :] = True
-        mask_bc[:, :, 0] = True;  mask_bc[:, :, -1] = True
+        mask_bc = np.zeros((N + 1, N + 1), dtype=bool)
+        mask_bc[0, :]  = True;  mask_bc[-1, :] = True
+        mask_bc[:, 0]  = True;  mask_bc[:, -1] = True
         idx_bc = np.where(mask_bc.ravel(order="F"))[0]
 
         A   = Lap.copy()
@@ -120,7 +115,7 @@ class PoissonSpectral3D:
         rhs[idx_bc]       = g_flat[idx_bc]
 
         phi_flat = np.linalg.solve(A, rhs)
-        phi      = phi_flat.reshape((N + 1, N + 1, N + 1), order="F")
+        phi      = phi_flat.reshape((N + 1, N + 1), order="F")
 
         # resíduo da equação de Poisson nos pontos interiores
         residuo = np.linalg.norm((Lap @ phi_flat - f_flat)[~mask_bc.ravel(order="F")],
@@ -129,10 +124,8 @@ class PoissonSpectral3D:
         return {
             'x': x,
             'y': y,
-            'z': z,
             'Xg': Xg,
             'Yg': Yg,
-            'Zg': Zg,
             'phi': phi,
             'rho': rho,
             'residuo': residuo,

@@ -1,5 +1,5 @@
 simulation:
-  n_cargas: 1
+  n_cargas: 2000
 
 intervals:
   parametro_eps0: 8.8541878128e-12
@@ -14,11 +14,14 @@ densidade_carga:
 
   tipo: gaussiana
   parametros:
-    amplitude: 100.0e-10
-    largura: 0.15
-    centro_x: 0.3
-    centro_y: -0.2
-    centro_z: 0.4
+    amplitude_min:  10.0e-2
+    amplitude_max: 100.0e-2
+    largura_min:     0.08
+    largura_max:     0.25
+    centro_x_min:   -0.5
+    centro_x_max:    0.5
+    centro_y_min:   -0.5
+    centro_y_max:    0.5
 
   # tipo: gaussiana_dupla
   # parametros:
@@ -36,15 +39,13 @@ solver:
     xmax: 1.0
     ymin: -1.0
     ymax: 1.0
-    zmin: -1.0
-    zmax: 1.0
 
 seed: 42
 
 mlp:
-  hidden_dims: [64, 128, 256]       # camadas ocultas
+  hidden_dims: [64, 128]            # camadas ocultas
   activation: "relu"                # função de ativação
-  batch_size: 128                   # tamanho do batch
-  epochs: 500                       # número de épocas
+  batch_size: 32                    # tamanho do batch
+  epochs: 150                       # número de épocas
   learning_rate: 0.001              # taxa de aprendizado
-  weight_decay: 0.0001              # regularização L2
+  weight_decay: 0.001               # regularização L2

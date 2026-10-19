@@ -29,7 +29,7 @@ def create_pipeline(**kwargs) -> Pipeline:
 
         node(
             func=gera_base_consolidada_node,
-            inputs=["solucao_espectral"],
+            inputs=["solucao_espectral", "distribuicoes_carga"],
             outputs="base_eletrostatica",
             name="node_gera_base_consolidada",
             tags=["data", "database"]

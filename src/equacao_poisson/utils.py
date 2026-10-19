@@ -1,5 +1,5 @@
 """
-Utilitários para o pipeline da equação de Poisson 3D em eletrostática.
+Utilitários para o pipeline da equação de Poisson 2D em eletrostática.
 """
 
 import numpy as np
@@ -25,7 +25,7 @@ def formatar_numero_pt_br(numero):
         return str(numero)
 
 
-def _viridis_deslocado(i_carga):
+def viridis_deslocado(i_carga):
     """
     Gera uma escala de cores baseada no Viridis, mas deslocada no espectro
     conforme o índice da carga. Isso mantém a familiaridade perceptual do
@@ -47,9 +47,8 @@ def _viridis_deslocado(i_carga):
     ]
 
     n = len(viridis)
-    shift = (i_carga * 3) % n   # deslocamento cíclico de 3 posições por carga
+    shift = (i_carga * 3) % n
 
-    # reconstrói a escala com deslocamento e renormaliza o eixo [0,1]
     reordenada = viridis[shift:] + viridis[:shift]
     escala = []
     for k, (_, cor) in enumerate(reordenada):
@@ -60,221 +59,141 @@ def _viridis_deslocado(i_carga):
 
 def cria_grafico_2d(solucao):
     """
-    Cria um gráfico 2D interativo com o potencial elétrico φ(x,y) no plano
-    z = meio do domínio, para todas as distribuições de carga resolvidas pela
-    equação de Poisson 3D em eletrostática.
+    Cria um gráfico 2D interativo com dois painéis lado a lado por carga:
+      - esquerda: ρ(x,y) — densidade de carga aplicada
+      - direita:  φ(x,y) — potencial elétrico (solução da equação de Poisson)
 
-    Cada distribuição de carga usa uma escala Viridis deslocada, permitindo
-    distinguir visualmente as amostras sem perder a leitura perceptual das
-    magnitudes. Um menu dropdown permite selecionar qual carga é exibida.
+    Uma única colorbar por painel, criada de forma independente das cargas,
+    para que não haja sobreposição ao alternar entre elas no dropdown.
     """
-    fig = go.Figure()
+    from plotly.subplots import make_subplots
 
     n_cargas = solucao['n_cargas']
     N        = solucao['N']
     x        = solucao['x']
     y        = solucao['y']
-    z        = solucao['z']
     eps0     = solucao['parametros_eps0'][0] if 'parametros_eps0' in solucao else 0.0
 
-    kz = N // 2
+    rho_vmin = float(solucao['cargas'].min())
+    rho_vmax = float(solucao['cargas'].max())
+    phi_vmin = float(solucao['potencial'].min())
+    phi_vmax = float(solucao['potencial'].max())
 
-    for i_carga in range(n_cargas):
-        phi_plano = solucao['potencial'][i_carga, :, :, kz]
-        visivel   = (i_carga == 0)
-
-        fig.add_trace(go.Contour(
-            x=x,
-            y=y,
-            z=phi_plano.T,
-            colorscale=_viridis_deslocado(i_carga),
-            zmin=phi_plano.min(),
-            zmax=phi_plano.max(),
-            contours=dict(coloring='heatmap', showlabels=True),
-            line=dict(width=0.5, color='rgba(255,255,255,0.4)'),
-            name=f"Carga {i_carga}",
-            showlegend=False,
-            visible=visivel,
-            opacity=0.85,
-            hovertemplate=(
-                f"<b>Carga {i_carga}</b><br>"
-                f"ε₀ = {eps0:.3e}<br>"
-                "x = %{x:.3f}<br>"
-                "y = %{y:.3f}<br>"
-                "φ = %{z:.3e}<br>"
-                "<extra></extra>"
-            ),
-            colorbar=dict(title="Potencial Elétrico φ(x,y) [V]", x=1.02, len=0.75) if visivel else None,
-        ))
-
-    botoes = []
-    for i_carga in range(n_cargas):
-        visibilidade = [False] * n_cargas
-        visibilidade[i_carga] = True
-        botoes.append(dict(
-            label=f"Carga {i_carga}",
-            method="update",
-            args=[
-                {"visible": visibilidade},
-                {"title.text":
-                    f"<span style='font-size:20px; font-weight:bold;'>"
-                    f"Potencial Eletrostático 2D — Equação de Poisson</span><br><br>"
-                    f"<span style='font-size:18px; color:#555555;'>"
-                    f"Corte em z = {z[kz]:.3f} | Carga {i_carga} | "
-                    f"Grau N = {N} | ε₀ = {eps0:.3e}</span>"}
-            ],
-        ))
-
-    fig.update_layout(
-        title=dict(
-            text=f"<span style='font-size:20px; font-weight:bold;'>"
-                 f"Potencial Eletrostático 2D — Equação de Poisson</span><br><br>"
-                 f"<span style='font-size:18px; color:#555555;'>"
-                 f"Corte em z = {z[kz]:.3f} | Carga 0 | "
-                 f"Grau N = {N} | ε₀ = {eps0:.3e}</span>",
-            x=0.50, y=0.95, font=dict(size=20)
-        ),
-        updatemenus=[dict(
-            type="dropdown",
-            buttons=botoes,
-            direction="down",
-            x=1.02, y=1.00,
-            xanchor="left", yanchor="top",
-            showactive=True,
-            bgcolor="white", bordercolor="black",
-            font=dict(size=13),
-        )],
-        xaxis_title="x",
-        yaxis_title="y",
-        width=1400,
-        height=1000,
-        hovermode='closest',
-        plot_bgcolor='white',
-        margin=dict(t=170, r=250),
-        xaxis=dict(
-            showgrid=False, zeroline=False,
-            title_font=dict(size=16), tickfont=dict(size=16),
-            range=[x.min(), x.max()]
-        ),
-        yaxis=dict(
-            showgrid=False, zeroline=False,
-            title_font=dict(size=16), tickfont=dict(size=16),
-            range=[y.min(), y.max()],
-            scaleanchor="x", scaleratio=1,
-        )
+    fig = make_subplots(
+        rows=1, cols=2,
+        subplot_titles=("Densidade de Carga ρ(x,y) [C/m²]",
+                        "Potencial Elétrico φ(x,y) [V]"),
+        horizontal_spacing=0.20,
     )
 
-    return fig
-
-
-def cria_grafico_3d(solucao):
-    """
-    Cria um gráfico 3D interativo com cortes ortogonais do potencial elétrico
-    φ(x,y,z) nos três planos centrais do domínio, para todas as distribuições
-    de carga resolvidas pela equação de Poisson 3D em eletrostática.
-
-    Cada distribuição de carga usa uma escala Viridis deslocada, permitindo
-    distinguir visualmente as amostras. Um menu dropdown permite selecionar
-    qual carga é exibida.
-    """
-    N        = solucao['N']
-    x        = solucao['x']
-    y        = solucao['y']
-    z        = solucao['z']
-    n_cargas = solucao['n_cargas']
-    eps0     = solucao['parametros_eps0'][0] if 'parametros_eps0' in solucao else 0.0
-
-    kx = N // 2
-    ky = N // 2
-    kz = N // 2
-
-    Xg, Yg, Zg = np.meshgrid(x, y, z, indexing="ij")
-
-    fig = go.Figure()
-
     for i_carga in range(n_cargas):
-        phi = solucao['potencial'][i_carga]
-        visivel = (i_carga == 0)
-        escala  = _viridis_deslocado(i_carga)
+        rho_plano = solucao['cargas'][i_carga, :, :]
+        phi_plano = solucao['potencial'][i_carga, :, :]
+        visivel   = (i_carga == 0)
 
-        # corte em x = meio (plano yz)
-        fig.add_trace(go.Surface(
-            x=np.full((N + 1, N + 1), x[kx]),
-            y=Yg[kx, :, :],
-            z=Zg[kx, :, :],
-            surfacecolor=phi[kx, :, :],
-            colorscale=escala,
-            cmin=phi.min(), cmax=phi.max(),
-            showscale=False,
-            opacity=0.95,
-            name=f"Carga {i_carga} (x = {x[kx]:.2f})",
-            visible=visivel,
-            showlegend=False,
-            hovertemplate=(
-                f"<b>Carga {i_carga}</b><br>"
-                f"ε₀ = {eps0:.3e}<br>"
-                f"x = {x[kx]:.3f}<br>"
-                "y = %{y:.3f}<br>"
-                "z = %{z:.3f}<br>"
-                "Potencial Elétrico φ(x,y,z) = %{surfacecolor:.3e}<br>"
-                "<extra></extra>"
+        # ρ(x,y)
+        fig.add_trace(
+            go.Contour(
+                x=x, y=y,
+                z=rho_plano.T,
+                colorscale="Viridis",
+                zmin=rho_vmin, zmax=rho_vmax,
+                contours=dict(coloring='heatmap', showlabels=True),
+                line=dict(width=0.5, color='rgba(255,255,255,0.4)'),
+                name=f"Carga {i_carga} (ρ)",
+                showlegend=False,
+                showscale=False,
+                visible=visivel,
+                opacity=0.85,
+                hovertemplate=(
+                    f"<b>Carga {i_carga} — ρ</b><br>"
+                    f"ε₀ = {eps0:.3e}<br>"
+                    "x = %{x:.3f}<br>"
+                    "y = %{y:.3f}<br>"
+                    "ρ = %{z:.3e} C/m²<br>"
+                    "<extra></extra>"
+                ),
             ),
-        ))
+            row=1, col=1,
+        )
 
-        # corte em y = meio (plano xz)
-        fig.add_trace(go.Surface(
-            x=Xg[:, ky, :],
-            y=np.full((N + 1, N + 1), y[ky]),
-            z=Zg[:, ky, :],
-            surfacecolor=phi[:, ky, :],
-            colorscale=escala,
-            cmin=phi.min(), cmax=phi.max(),
-            showscale=False,
-            opacity=0.95,
-            name=f"Carga {i_carga} (y = {y[ky]:.2f})",
-            visible=visivel,
-            showlegend=False,
-            hovertemplate=(
-                f"<b>Carga {i_carga}</b><br>"
-                f"ε₀ = {eps0:.3e}<br>"
-                "x = %{x:.3f}<br>"
-                f"y = {y[ky]:.3f}<br>"
-                "z = %{z:.3f}<br>"
-                "Potencial Elétrico φ(x,y,z) = %{surfacecolor:.3e}<br>"
-                "<extra></extra>"
+        # φ(x,y)
+        fig.add_trace(
+            go.Contour(
+                x=x, y=y,
+                z=phi_plano.T,
+                colorscale="Viridis",
+                zmin=phi_vmin, zmax=phi_vmax,
+                contours=dict(coloring='heatmap', showlabels=True),
+                line=dict(width=0.5, color='rgba(255,255,255,0.4)'),
+                name=f"Carga {i_carga} (φ)",
+                showlegend=False,
+                showscale=False,
+                visible=visivel,
+                opacity=0.85,
+                hovertemplate=(
+                    f"<b>Carga {i_carga} — φ</b><br>"
+                    f"ε₀ = {eps0:.3e}<br>"
+                    "x = %{x:.3f}<br>"
+                    "y = %{y:.3f}<br>"
+                    "φ = %{z:.3e} V<br>"
+                    "<extra></extra>"
+                ),
             ),
-        ))
+            row=1, col=2,
+        )
 
-        # corte em z = meio (plano xy)
-        fig.add_trace(go.Surface(
-            x=Xg[:, :, kz],
-            y=Yg[:, :, kz],
-            z=np.full((N + 1, N + 1), z[kz]),
-            surfacecolor=phi[:, :, kz],
-            colorscale=escala,
-            cmin=phi.min(), cmax=phi.max(),
-            showscale=visivel,
-            colorbar=dict(title="Potencial Elétrico φ(x,y,z) [V]", x=1.02, len=0.75) if visivel else None,
-            opacity=0.95,
-            name=f"Carga {i_carga} (z = {z[kz]:.2f})",
-            visible=visivel,
-            showlegend=False,
-            hovertemplate=(
-                f"<b>Carga {i_carga}</b><br>"
-                f"ε₀ = {eps0:.3e}<br>"
-                "x = %{x:.3f}<br>"
-                "y = %{y:.3f}<br>"
-                f"z = {z[kz]:.3f}<br>"
-                "Potencial Elétrico φ(x,y,z) = %{surfacecolor:.3e}<br>"
-                "<extra></extra>"
+    fig.add_trace(
+        go.Scatter(
+            x=[None], y=[None],
+            mode='markers',
+            marker=dict(
+                colorscale="Viridis",
+                cmin=rho_vmin, cmax=rho_vmax,
+                showscale=True,
+                colorbar=dict(
+                    title="ρ (C/m²)",
+                    x=-0.10,
+                    len=0.75,
+                    xanchor="right",
+                ),
             ),
-        ))
+            showlegend=False,
+            hoverinfo='skip',
+            name='colorbar_rho',
+        ),
+        row=1, col=1,
+    )
 
+    fig.add_trace(
+        go.Scatter(
+            x=[None], y=[None],
+            mode='markers',
+            marker=dict(
+                colorscale="Viridis",
+                cmin=phi_vmin, cmax=phi_vmax,
+                showscale=True,
+                colorbar=dict(
+                    title="φ (V)",
+                    x=1.05,
+                    len=0.75,
+                    xanchor="left",
+                ),
+            ),
+            showlegend=False,
+            hoverinfo='skip',
+            name='colorbar_phi',
+        ),
+        row=1, col=2,
+    )
+
+    n_tracos_dados = 2 * n_cargas
     botoes = []
     for i_carga in range(n_cargas):
-        visibilidade = [False] * (3 * n_cargas)
-        for j in range(3):
-            visibilidade[3 * i_carga + j] = True
+        visibilidade = [False] * n_tracos_dados + [True, True]
+        visibilidade[2 * i_carga]     = True   # ρ da carga i
+        visibilidade[2 * i_carga + 1] = True   # φ da carga i
+
         botoes.append(dict(
             label=f"Carga {i_carga}",
             method="update",
@@ -282,258 +201,139 @@ def cria_grafico_3d(solucao):
                 {"visible": visibilidade},
                 {"title.text":
                     f"<span style='font-size:20px; font-weight:bold;'>"
-                    f"Potencial Eletrostático 3D — Equação de Poisson</span><br><br>"
-                    f"<span style='font-size:16px; color:#555555;'>"
-                    f"Cortes Ortogonais | Carga {i_carga} | "
-                    f"Grau N = {N} | ε₀ = {eps0:.3e}</span>"}
+                    f"Equação de Poisson 2D — Densidade de Carga e Potencial Elétrico"
+                    f"</span><br><br>"
+                    f"<span style='font-size:18px; color:#555555;'>"
+                    f"Carga {i_carga} | Grau N = {N} | ε₀ = {eps0:.3e}</span>"}
             ],
         ))
 
     fig.update_layout(
         title=dict(
             text=f"<span style='font-size:20px; font-weight:bold;'>"
-                 f"Potencial Eletrostático 3D — Equação de Poisson</span><br><br>"
-                 f"<span style='font-size:16px; color:#555555;'>"
-                 f"Cortes Ortogonais | Carga 0 | "
-                 f"Grau N = {N} | ε₀ = {eps0:.3e}</span>",
+                 f"Equação de Poisson 2D — Densidade de Carga e Potencial Elétrico"
+                 f"</span><br><br>"
+                 f"<span style='font-size:18px; color:#555555;'>"
+                 f"Carga 0 | Grau N = {N} | ε₀ = {eps0:.3e}</span>",
             x=0.50, y=0.95, font=dict(size=20),
         ),
         updatemenus=[dict(
             type="dropdown",
             buttons=botoes,
             direction="down",
-            x=1.02, y=1.00,
+            x=1.05, y=1.00,
             xanchor="left", yanchor="top",
             showactive=True,
             bgcolor="white", bordercolor="black",
             font=dict(size=13),
         )],
-        scene=dict(
-            xaxis_title="x",
-            yaxis_title="y",
-            zaxis_title="z",
-            xaxis=dict(range=[x.min(), x.max()]),
-            yaxis=dict(range=[y.min(), y.max()]),
-            zaxis=dict(range=[z.min(), z.max()]),
-            aspectmode="cube",
-        ),
-        width=1000,
-        height=850,
-        margin=dict(t=170, r=140),
-    )
-
-    return fig
-
-def cria_grafico_distribuicao_amplitudes(
-    amplitudes,
-    titulo="Distribuição das Amplitudes - Equação de Poisson 3D"
-):
-    """
-    Cria gráfico 2D mostrando a distribuição das amplitudes (de ρ ou φ)
-    por distribuição de carga.
-
-    Args:
-        amplitudes: Array com as amplitudes por carga
-        titulo: Título do gráfico
-
-    Returns:
-        Figura Plotly
-    """
-    fig = go.Figure()
-
-    amplitudes_flat = np.asarray(amplitudes).flatten()
-
-    fig.add_trace(go.Histogram(
-        x=amplitudes_flat,
-        nbinsx=30,
-        name='Amplitudes',
-        marker=dict(
-            color='#2E7D32',
-            opacity=0.85,
-            line=dict(color='black', width=0.5),
-        ),
-        hovertemplate=(
-            "<b>Amplitude</b><br>" +
-            "Intervalo: %{x:.4f}<br>" +
-            "Contagem: %{y}<br>" +
-            "<extra></extra>"
-        ),
-    ))
-
-    n_total = len(amplitudes_flat)
-    amp_min = float(np.min(amplitudes_flat))
-    amp_max = float(np.max(amplitudes_flat))
-    amp_med = float(np.median(amplitudes_flat))
-
-    fig.update_layout(
-        title=dict(
-            text=f"<span style='font-size:20px; font-weight:bold;'>{titulo}</span><br><br>" +
-                 f"<span style='font-size:20px; color:#555555;'>" +
-                 f"<sup>Total: {n_total} | " +
-                 f"Mín: {amp_min:.4f} | " +
-                 f"Mediana: {amp_med:.4f} | " +
-                 f"Máx: {amp_max:.4f}</sup>",
-            x=0.50,
-            y=0.95,
-            font=dict(size=20)
-        ),
-        xaxis_title="Amplitude Máxima",
-        yaxis_title="Frequência",
-        width=1400,
-        height=1000,
-        legend=dict(
-            title="Legenda",
-            x=0.85,
-            y=0.98,
-            bgcolor='rgba(255, 255, 255, 0.9)',
-            bordercolor='black',
-            borderwidth=1,
-            font=dict(size=16),
-            itemclick="toggle",
-            itemdoubleclick="toggleothers"
-        ),
+        width=1700, height=800,
         hovermode='closest',
         plot_bgcolor='white',
-        margin=dict(t=150),
-        bargap=0.05,
-        xaxis=dict(
-            showgrid=False,
-            gridcolor='lightgray',
-            zeroline=True,
-            zerolinecolor='black',
-            zerolinewidth=1,
-            title_font=dict(size=16),
-            tickfont=dict(size=16)
-        ),
-        yaxis=dict(
-            showgrid=False,
-            gridcolor='lightgray',
-            zeroline=True,
-            zerolinecolor='black',
-            zerolinewidth=1,
-            title_font=dict(size=16),
-            tickfont=dict(size=16)
-        )
+        margin=dict(t=170, r=250, b=60, l=140),
+    )
+
+    fig.update_xaxes(
+        title_text="x", showgrid=False, zeroline=False,
+        title_font=dict(size=16), tickfont=dict(size=16),
+        range=[x.min(), x.max()],
+        row=1, col=1,
+    )
+    fig.update_yaxes(
+        title_text="y", showgrid=False, zeroline=False,
+        title_font=dict(size=16), tickfont=dict(size=16),
+        range=[y.min(), y.max()],
+        scaleanchor="x", scaleratio=1,
+        row=1, col=1,
+    )
+    fig.update_xaxes(
+        title_text="x", showgrid=False, zeroline=False,
+        title_font=dict(size=16), tickfont=dict(size=16),
+        range=[x.min(), x.max()],
+        row=1, col=2,
+    )
+    fig.update_yaxes(
+        title_text="y", showgrid=False, zeroline=False,
+        title_font=dict(size=16), tickfont=dict(size=16),
+        range=[y.min(), y.max()],
+        scaleanchor="x", scaleratio=1,
+        row=1, col=2,
     )
 
     return fig
 
 
-def cria_grafico_distribuicao_dados(
-    y_carga_train, y_pot_train,
-    y_carga_val,   y_pot_val,
-    y_carga_test,  y_pot_test,
-    titulo="Distribuição dos Dados - Equação de Poisson 3D (por ponto)"
+def cria_grafico_distribuicao_cargas(
+    cargas_train, cargas_val, cargas_test,
+    amplitudes_carga,
+    titulo="Cargas por Conjunto — Ordenadas por Amplitude de ρ"
 ):
     """
-    Cria gráfico 2D mostrando a distribuição dos dados de densidade de carga ρ
-    e potencial φ para treino, validação e teste.
+    Cria gráfico 2D mostrando quais cargas foram atribuídas a cada conjunto
+    (treino/validação/teste), ordenadas por amplitude máxima de ρ.
 
-    Cada ponto da malha é uma amostra, então os arrays são achatados para
-    visualização pontual.
+    Útil para verificar visualmente se a divisão 70/20/10 está balanceada
+    em termos de magnitude das cargas — cenário onde cada carga é uma amostra
+    completa (malha inteira como entrada/saída do MLP).
 
     Args:
-        y_carga_train: Densidades de carga de treino
-        y_pot_train:   Potenciais de treino
-        y_carga_val:   Densidades de carga de validação
-        y_pot_val:     Potenciais de validação
-        y_carga_test:  Densidades de carga de teste
-        y_pot_test:    Potenciais de teste
-        titulo: Título do gráfico
+        cargas_train : array com os IDs das cargas de treino
+        cargas_val   : array com os IDs das cargas de validação
+        cargas_test  : array com os IDs das cargas de teste
+        amplitudes_carga : dict {carga_id: amplitude_max_de_rho}
+        titulo       : título do gráfico
 
     Returns:
         Figura Plotly
     """
     fig = go.Figure()
 
-    # achata os arrays para visualização
-    y_carga_train_flat = y_carga_train.flatten() if y_carga_train.ndim > 1 else y_carga_train
-    y_pot_train_flat   = y_pot_train.flatten()   if y_pot_train.ndim   > 1 else y_pot_train
-    y_carga_val_flat   = y_carga_val.flatten()   if y_carga_val.ndim   > 1 else y_carga_val
-    y_pot_val_flat     = y_pot_val.flatten()     if y_pot_val.ndim     > 1 else y_pot_val
-    y_carga_test_flat  = y_carga_test.flatten()  if y_carga_test.ndim  > 1 else y_carga_test
-    y_pot_test_flat    = y_pot_test.flatten()    if y_pot_test.ndim    > 1 else y_pot_test
-
-    # treino
-    fig.add_trace(go.Scatter(
-        x=y_carga_train_flat,
-        y=y_pot_train_flat,
-        mode='markers',
-        name='Dados de Treino (70%)',
-        marker=dict(
-            color='#2E7D32',
-            size=4,
-            opacity=0.9,
-            symbol='circle'
-        ),
-        hovertemplate=(
-            "<b>Dados de Treino</b><br>" +
-            "ρ: %{x:.3e}<br>" +
-            "φ: %{y:.3e}<br>" +
-            "<extra></extra>"
-        )
-    ))
-
-    # validação
-    fig.add_trace(go.Scatter(
-        x=y_carga_val_flat,
-        y=y_pot_val_flat,
-        mode='markers',
-        name='Dados de Validação (20%)',
-        marker=dict(
-            color='#0D47A1',
-            size=4,
-            opacity=0.9,
-            symbol='square'
-        ),
-        hovertemplate=(
-            "<b>Dados de Validação</b><br>" +
-            "ρ: %{x:.3e}<br>" +
-            "φ: %{y:.3e}<br>" +
-            "<extra></extra>"
-        )
-    ))
-
-    # teste
-    fig.add_trace(go.Scatter(
-        x=y_carga_test_flat,
-        y=y_pot_test_flat,
-        mode='markers',
-        name='Dados de Teste (10%)',
-        marker=dict(
-            color='#F57F17',
-            size=4,
-            opacity=0.9,
-            symbol='diamond'
-        ),
-        hovertemplate=(
-            "<b>Dados de Teste</b><br>" +
-            "ρ: %{x:.3e}<br>" +
-            "φ: %{y:.3e}<br>" +
-            "<extra></extra>"
-        )
-    ))
-
-    n_train = len(y_carga_train_flat)
-    n_val   = len(y_carga_val_flat)
-    n_test  = len(y_carga_test_flat)
+    n_train = len(cargas_train)
+    n_val   = len(cargas_val)
+    n_test  = len(cargas_test)
     total   = n_train + n_val + n_test
 
+    fig.add_trace(go.Scatter(
+        x=[int(c) for c in cargas_train],
+        y=[amplitudes_carga[c] for c in cargas_train],
+        mode='markers',
+        name=f'Treino ({n_train})',
+        marker=dict(color='#2E7D32', size=10, symbol='circle'),
+        hovertemplate="Carga: %{x}<br>Amplitude ρ: %{y:.4e}<extra></extra>"
+    ))
+
+    fig.add_trace(go.Scatter(
+        x=[int(c) for c in cargas_val],
+        y=[amplitudes_carga[c] for c in cargas_val],
+        mode='markers',
+        name=f'Validação ({n_val})',
+        marker=dict(color='#0D47A1', size=10, symbol='square'),
+        hovertemplate="Carga: %{x}<br>Amplitude ρ: %{y:.4e}<extra></extra>"
+    ))
+
+    fig.add_trace(go.Scatter(
+        x=[int(c) for c in cargas_test],
+        y=[amplitudes_carga[c] for c in cargas_test],
+        mode='markers',
+        name=f'Teste ({n_test})',
+        marker=dict(color='#F57F17', size=10, symbol='diamond'),
+        hovertemplate="Carga: %{x}<br>Amplitude ρ: %{y:.4e}<extra></extra>"
+    ))
+
     fig.update_layout(
         title=dict(
-            text=f"<span style='font-size:20px; font-weight:bold;'>{titulo}</span><br><br>" +
-                 f"<span style='font-size:20px; color:#555555;'>" +
-                 f"<sup>Treino: {n_train} ({n_train/total*100:.1f}%) | " +
-                 f"Validação: {n_val} ({n_val/total*100:.1f}%) | " +
-                 f"Teste: {n_test} ({n_test/total*100:.1f}%)</sup>",
-            x=0.50,
-            y=0.95,
-            font=dict(size=20)
+            text=f"<span style='font-size:20px; font-weight:bold;'>{titulo}</span><br><br>"
+                 f"<span style='font-size:16px; color:#555555;'>"
+                 f"Total: {total} distribuições de cargas | "
+                 f"Treino: {n_train} ({n_train/total*100:.1f}%) | "
+                 f"Validação: {n_val} ({n_val/total*100:.1f}%) | "
+                 f"Teste: {n_test} ({n_test/total*100:.1f}%)</span>",
+            x=0.5, y=0.95, font=dict(size=20)
         ),
-        xaxis_title="Densidade de Carga ρ(x,y,z) [C/m³]",
-        yaxis_title="Potencial Elétrico φ(x,y,z) [V]",
+        xaxis_title="ID da carga",
+        yaxis_title="Amplitude Máxima de ρ [C/m²]",
         width=1400,
-        height=1000,
+        height=700,
         legend=dict(
             title="Legenda",
             x=0.85,
@@ -547,177 +347,14 @@ def cria_grafico_distribuicao_dados(
         ),
         hovermode='closest',
         plot_bgcolor='white',
-        margin=dict(t=150),
-        xaxis=dict(
-            showgrid=False,
-            gridcolor='lightgray',
-            zeroline=True,
-            zerolinecolor='black',
-            zerolinewidth=1,
-            title_font=dict(size=16),
-            tickfont=dict(size=16)
-        ),
-        yaxis=dict(
-            showgrid=False,
-            gridcolor='lightgray',
-            zeroline=True,
-            zerolinecolor='black',
-            zerolinewidth=1,
-            title_font=dict(size=16),
-            tickfont=dict(size=16)
-        )
-    )
-
-    return fig
-
-
-def cria_grafico_distribuicao_espacial(
-    x_train, y_train, z_train,
-    x_val,   y_val,   z_val,
-    x_test,  y_test,  z_test,
-    titulo="Distribuição Espacial dos Pontos - Equação de Poisson 3D (por ponto)"
-):
-    """
-    Cria gráfico 3D mostrando a distribuição espacial dos pontos de colocação
-    para treino, validação e teste.
-
-    Args:
-        x_train, y_train, z_train: Coordenadas dos pontos de treino
-        x_val,   y_val,   z_val:   Coordenadas dos pontos de validação
-        x_test,  y_test,  z_test:  Coordenadas dos pontos de teste
-        titulo: Título do gráfico
-
-    Returns:
-        Figura Plotly
-    """
-    fig = go.Figure()
-
-    x_train_flat = x_train.flatten() if x_train.ndim > 1 else x_train
-    y_train_flat = y_train.flatten() if y_train.ndim > 1 else y_train
-    z_train_flat = z_train.flatten() if z_train.ndim > 1 else z_train
-
-    x_val_flat = x_val.flatten() if x_val.ndim > 1 else x_val
-    y_val_flat = y_val.flatten() if y_val.ndim > 1 else y_val
-    z_val_flat = z_val.flatten() if z_val.ndim > 1 else z_val
-
-    x_test_flat = x_test.flatten() if x_test.ndim > 1 else x_test
-    y_test_flat = y_test.flatten() if y_test.ndim > 1 else y_test
-    z_test_flat = z_test.flatten() if z_test.ndim > 1 else z_test
-
-    # treino
-    fig.add_trace(go.Scatter3d(
-        x=x_train_flat,
-        y=y_train_flat,
-        z=z_train_flat,
-        mode='markers',
-        name='Dados de Treino (70%)',
-        marker=dict(
-            color='#2E7D32',
-            size=3,
-            opacity=0.9,
-            symbol='circle'
-        ),
-        hovertemplate=(
-            "<b>Dados de Treino</b><br>" +
-            "x: %{x:.3f}<br>" +
-            "y: %{y:.3f}<br>" +
-            "z: %{z:.3f}<br>" +
-            "<extra></extra>"
-        )
-    ))
-
-    # validação
-    fig.add_trace(go.Scatter3d(
-        x=x_val_flat,
-        y=y_val_flat,
-        z=z_val_flat,
-        mode='markers',
-        name='Dados de Validação (20%)',
-        marker=dict(
-            color='#0D47A1',
-            size=3,
-            opacity=0.9,
-            symbol='circle'
-        ),
-        hovertemplate=(
-            "<b>Dados de Validação</b><br>" +
-            "x: %{x:.3f}<br>" +
-            "y: %{y:.3f}<br>" +
-            "z: %{z:.3f}<br>" +
-            "<extra></extra>"
-        )
-    ))
-
-    # teste
-    fig.add_trace(go.Scatter3d(
-        x=x_test_flat,
-        y=y_test_flat,
-        z=z_test_flat,
-        mode='markers',
-        name='Dados de Teste (10%)',
-        marker=dict(
-            color='#F57F17',
-            size=3,
-            opacity=0.9,
-            symbol='circle'
-        ),
-        hovertemplate=(
-            "<b>Dados de Teste</b><br>" +
-            "x: %{x:.3f}<br>" +
-            "y: %{y:.3f}<br>" +
-            "z: %{z:.3f}<br>" +
-            "<extra></extra>"
-        )
-    ))
-
-    n_train = len(x_train_flat)
-    n_val   = len(x_val_flat)
-    n_test  = len(x_test_flat)
-    total   = n_train + n_val + n_test
-
-    fig.update_layout(
-        title=dict(
-            text=f"<span style='font-size:20px; font-weight:bold;'>{titulo}</span><br><br>" +
-                 f"<span style='font-size:20px; color:#555555;'>" +
-                 f"<sup>Treino: {n_train} ({n_train/total*100:.1f}%) | " +
-                 f"Validação: {n_val} ({n_val/total*100:.1f}%) | " +
-                 f"Teste: {n_test} ({n_test/total*100:.1f}%)</sup>",
-            x=0.50,
-            y=0.95,
-            font=dict(size=20)
-        ),
-        scene=dict(
-            xaxis_title="x",
-            yaxis_title="y",
-            zaxis_title="z",
-            xaxis=dict(title_font=dict(size=16), tickfont=dict(size=14)),
-            yaxis=dict(title_font=dict(size=16), tickfont=dict(size=14)),
-            zaxis=dict(title_font=dict(size=16), tickfont=dict(size=14)),
-            aspectmode="cube",
-        ),
-        width=1400,
-        height=1000,
-        legend=dict(
-            title="Legenda",
-            x=0.85,
-            y=0.98,
-            bgcolor='rgba(255, 255, 255, 0.9)',
-            bordercolor='black',
-            borderwidth=1,
-            font=dict(size=16),
-            itemclick="toggle",
-            itemdoubleclick="toggleothers"
-        ),
-        hovermode='closest',
-        plot_bgcolor='white',
-        margin=dict(t=150),
+        margin=dict(t=140),
     )
 
     return fig
 
 def cria_grafico_historico_treinamento(
     history: Dict,
-    titulo: str = "Evolução da Função de Custo durante o Treinamento - Equação de Poisson 3D"
+    titulo: str = "Evolução da Função de Custo durante o Treinamento - Equação de Poisson 2D"
 ) -> go.Figure:
     """
     Cria gráfico da evolução das funções de custo de treino e validação ao longo das épocas.
@@ -821,22 +458,25 @@ def cria_grafico_historico_treinamento(
 def cria_grafico_real_previsto_mlp(
     predictions,
     y_true,
-    titulo="Previsões do Modelo MLP - Equação de Poisson 3D"
+    titulo="Previsões do Modelo MLP - Equação de Poisson 2D"
 ):
     """
     Cria gráfico de dispersão para visualizar as previsões do modelo MLP.
-    Os dados são achatados para visualização ponto a ponto (cada ponto da
-    malha é uma amostra).
+
+    Cada linha de `predictions` e `y_true` corresponde a uma distribuição de
+    carga completa (malha inteira achatada). Os arrays são achatados para
+    agregação visual ponto a ponto de todas as cargas × todos os pontos da
+    malha.
 
     Args:
-        predictions: array com as previsões φ(x,y,z) por ponto
-        y_true: array com os valores de referência φ(x,y,z) por ponto
+        predictions: array com as previsões φ(x,y) por carga, shape (n_cargas, (N+1)²)
+        y_true: array com os valores de referência φ(x,y) por carga, mesmo shape
         titulo: título do gráfico
 
     Returns:
         Figura Plotly
     """
-    # achata para visualização pontual
+    # achata para visualização agregada (cargas × pontos)
     y_pred_flat = predictions.flatten() if predictions.ndim > 1 else predictions
     y_true_flat = y_true.flatten()     if y_true.ndim     > 1 else y_true
 
@@ -847,7 +487,7 @@ def cria_grafico_real_previsto_mlp(
         x=y_true_flat,
         y=y_pred_flat,
         mode='markers',
-        name='Potencial Elétrico φ(x,y,z)',
+        name='Potencial Elétrico φ(x,y)',
         marker=dict(
             color='#BF360C',
             size=3,
@@ -855,7 +495,7 @@ def cria_grafico_real_previsto_mlp(
             symbol='circle'
         ),
         hovertemplate=(
-            "<b>Potencial Elétrico φ(x,y,z)</b><br>" +
+            "<b>Potencial Elétrico φ(x,y)</b><br>" +
             "Real: %{x:.3e}<br>" +
             "Previsto: %{y:.3e}<br>" +
             "<extra></extra>"
@@ -932,112 +572,170 @@ def cria_grafico_real_previsto_mlp(
 
 
 def cria_grafico_previsoes_espaco_fases(
-    y_true,
-    y_pred,
-    titulo="Previsões do Modelo - Equação de Poisson 3D"
+    phi_pred,
+    phi_true,
+    rho_inputs,
+    parametros_cargas,
+    x_grid,
+    y_grid,
+    titulo="Previsões do Modelo - Equação de Poisson 2D"
 ):
     """
-    Cria gráfico de dispersão comparando o potencial elétrico φ(x,y,z) previsto
-    pelo modelo com o de referência, ponto a ponto.
+    Cria gráfico interativo com dois mapas de calor lado a lado por carga:
+      - esquerda: φ(x,y) previsto (MLP)
+      - direita:  φ(x,y) real (solução espectral)
+
+    Um menu dropdown permite selecionar qual carga é exibida:
+      - o rótulo do botão mostra os parâmetros sorteados da gaussiana
+        (amplitude e largura);
+      - o subtítulo do gráfico mostra RMSE e R² da carga em exibição.
 
     Args:
-        y_true: Valores de referência de φ(x,y,z) (achatados)
-        y_pred: Valores previstos de φ(x,y,z) (achatados)
-        titulo: Título do gráfico
+        phi_pred:          array (n_cargas, N+1, N+1) — φ(x,y) previsto (MLP)
+        phi_true:          array (n_cargas, N+1, N+1) — φ(x,y) real (solução espectral)
+        rho_inputs:        array (n_cargas, N+1, N+1) — ρ(x,y) aplicada em cada carga
+        parametros_cargas: DataFrame ou dict com os parâmetros sorteados de cada carga
+                           (colunas: amplitude, largura, centro_x, centro_y)
+        x_grid:            array 1D com as coordenadas x da malha
+        y_grid:            array 1D com as coordenadas y da malha
+        titulo:            título do gráfico
 
     Returns:
         Figura Plotly
     """
-    y_true_flat = np.asarray(y_true).flatten()
-    y_pred_flat = np.asarray(y_pred).flatten()
 
-    fig = go.Figure()
+    n_cargas = phi_pred.shape[0]
+    N_plus_1 = phi_pred.shape[1]
 
-    # previsões do modelo
-    fig.add_trace(go.Scatter(
-        x=y_true_flat,
-        y=y_pred_flat,
-        mode='markers',
-        name='Potencial Elétrico φ(x,y,z) MLP',
-        marker=dict(
-            color='#BF360C',
-            size=3,
-            opacity=0.6,
-            symbol='diamond'
-        ),
-        hovertemplate=(
-            "<b>Potencial Elétrico φ(x,y,z)</b><br>" +
-            "Potencial Elétrico φ(x,y,z) Real: %{x:.3e}<br>" +
-            "Potencial Elétrico φ(x,y,z) Previsto: %{y:.3e}<br>" +
-            "<extra></extra>"
+    vmin = float(min(phi_pred.min(), phi_true.min()))
+    vmax = float(max(phi_pred.max(), phi_true.max()))
+
+    MAX_CARGAS_VIS = min(10, n_cargas)
+
+    fig = make_subplots(
+        rows=1, cols=2,
+        subplot_titles=("φ(x,y) Previsto (MLP)", "φ(x,y) Real (Solução Espectral)"),
+        horizontal_spacing=0.12,
+    )
+
+    for i_carga in range(MAX_CARGAS_VIS):
+        visivel = (i_carga == 0)
+
+        fig.add_trace(
+            go.Heatmap(
+                x=x_grid,
+                y=y_grid,
+                z=phi_pred[i_carga].T,
+                colorscale="Viridis",
+                zmin=vmin, zmax=vmax,
+                showscale=visivel,
+                colorbar=dict(title="φ (V)", x=1.02) if visivel else None,
+                visible=visivel,
+                hovertemplate=(
+                    f"<b>Carga {i_carga} — Previsto (MLP)</b><br>"
+                    "x = %{x:.3f}<br>"
+                    "y = %{y:.3f}<br>"
+                    "φ = %{z:.3e} V<br>"
+                    "<extra></extra>"
+                ),
+                name=f"Carga {i_carga} Previsto (MLP)",
+            ),
+            row=1, col=1,
         )
-    ))
 
-    # linha y=x (referência)
-    min_val = float(min(y_true_flat.min(), y_pred_flat.min()))
-    max_val = float(max(y_true_flat.max(), y_pred_flat.max()))
+        fig.add_trace(
+            go.Heatmap(
+                x=x_grid,
+                y=y_grid,
+                z=phi_true[i_carga].T,
+                colorscale="Viridis",
+                zmin=vmin, zmax=vmax,
+                showscale=False,
+                visible=visivel,
+                hovertemplate=(
+                    f"<b>Carga {i_carga} — Real (Solução Espectral)</b><br>"
+                    "x = %{x:.3f}<br>"
+                    "y = %{y:.3f}<br>"
+                    "φ = %{z:.3e} V<br>"
+                    "<extra></extra>"
+                ),
+                name=f"Carga {i_carga} Real (Solução Espectral)",
+            ),
+            row=1, col=2,
+        )
 
-    fig.add_trace(go.Scatter(
-        x=[min_val, max_val],
-        y=[min_val, max_val],
-        mode='lines',
-        name='Referência (y=x)',
-        line=dict(color='#1B5E20', width=2, dash='dot'),
-        hovertemplate='Referência: %{x:.3e}<extra></extra>'
-    ))
+    def _param(carga_idx, chave):
+        """Extrai o parâmetro `chave` da carga `carga_idx` do DataFrame/dict."""
+        if hasattr(parametros_cargas, 'iloc'):
+            return parametros_cargas.iloc[carga_idx][chave]
+        else:
+            return parametros_cargas[chave][carga_idx]
 
-    rmse = np.sqrt(mean_squared_error(y_true_flat, y_pred_flat))
-    r2   = r2_score(y_true_flat, y_pred_flat)
+    def _metricas_carga(i_carga):
+        """Calcula RMSE e R² da carga `i_carga` (previsto vs. real)."""
+        y_true = phi_true[i_carga].flatten()
+        y_pred = phi_pred[i_carga].flatten()
+        rmse = float(np.sqrt(mean_squared_error(y_true, y_pred)))
+        r2   = float(r2_score(y_true, y_pred))
+        return rmse, r2
+
+    def _subtitulo_carga(i_carga):
+        """Subtítulo com RMSE e R² da carga em exibição."""
+        rmse, r2 = _metricas_carga(i_carga)
+        return (
+            f"Carga {i_carga} | "
+            f"RMSE = {rmse:.3e} V | "
+            f"R² = {r2:.4f}"
+        )
+
+    botoes = []
+    for i_carga in range(MAX_CARGAS_VIS):
+        visibilidade = [False] * (2 * MAX_CARGAS_VIS)
+        visibilidade[2 * i_carga]     = True
+        visibilidade[2 * i_carga + 1] = True
+
+        botoes.append(dict(
+            label=f"Carga {i_carga}  (A={_param(i_carga, 'amplitude'):.2e}, "
+                  f"σ={_param(i_carga, 'largura'):.3f}, "
+                  f"c=({_param(i_carga, 'centro_x'):.2f}, "
+                  f"{_param(i_carga, 'centro_y'):.2f}))",
+            method="update",
+            args=[
+                {"visible": visibilidade},
+                {"title.text":
+                    f"<span style='font-size:20px; font-weight:bold;'>{titulo}</span><br><br>"
+                    f"<span style='font-size:16px; color:#555555;'>"
+                    f"{_subtitulo_carga(i_carga)}</span>"}
+            ],
+        ))
 
     fig.update_layout(
         title=dict(
-            text=f"<span style='font-size:20px; font-weight:bold;'>{titulo}</span><br><br>" +
-                 f"<span style='font-size:20px; color:#555555;'>" +
-                 f"<sup>RMSE: {rmse:.4e} | R²: {r2:.4f}</sup>",
-            x=0.5,
-            y=0.95,
-            font=dict(size=16)
+            text=f"<span style='font-size:20px; font-weight:bold;'>{titulo}</span><br><br>"
+                 f"<span style='font-size:16px; color:#555555;'>"
+                 f"{_subtitulo_carga(0)}</span>",
+            x=0.5, y=0.96, font=dict(size=20),
         ),
-        xaxis_title="Potencial Elétrico Real [V]",
-        yaxis_title="Potencial Elétrico Previsto [V]",
-        width=1400,
-        height=1000,
-        legend=dict(
-            title="Legenda",
-            x=0.95,
-            y=0.95,
-            bgcolor='rgba(255, 255, 255, 0.9)',
-            bordercolor='black',
-            borderwidth=1,
-            font=dict(size=14),
-            itemclick="toggle",
-            itemdoubleclick="toggleothers"
-        ),
+        updatemenus=[dict(
+            type="dropdown",
+            buttons=botoes,
+            direction="down",
+            x=1.02, y=1.00,
+            xanchor="left", yanchor="top",
+            showactive=True,
+            bgcolor="white", bordercolor="black",
+            font=dict(size=13),
+        )],
+        width=1400, height=700,
         hovermode='closest',
         plot_bgcolor='white',
-        paper_bgcolor='white',
-        margin=dict(t=150),
-        xaxis=dict(
-            showgrid=False,
-            gridcolor='darkgray',
-            zeroline=True,
-            zerolinecolor='darkgray',
-            zerolinewidth=1,
-            title_font=dict(size=16),
-            tickfont=dict(size=16)
-        ),
-        yaxis=dict(
-            showgrid=False,
-            gridcolor='darkgray',
-            zeroline=True,
-            zerolinecolor='darkgray',
-            zerolinewidth=1,
-            title_font=dict(size=16),
-            tickfont=dict(size=16),
-            scaleanchor="x",
-            scaleratio=1,
-        )
+        margin=dict(t=170, r=180, b=60, l=60),
     )
+
+    fig.update_xaxes(title_text="x", row=1, col=1)
+    fig.update_yaxes(title_text="y", row=1, col=1, scaleanchor="x", scaleratio=1)
+    fig.update_xaxes(title_text="x", row=1, col=2)
+    fig.update_yaxes(title_text="y", row=1, col=2, scaleanchor="x", scaleratio=1)
 
     return fig
 

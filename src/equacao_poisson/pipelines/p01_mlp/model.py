@@ -1,7 +1,13 @@
 """
-Definição da arquitetura do MLP para previsão do potencial elétrico φ(x,y,z)
-a partir das coordenadas espaciais (x, y, z) e da densidade de carga ρ(x,y,z)
-na equação de Poisson 3D em eletrostática.
+Definição da arquitetura do MLP para previsão do potencial elétrico φ(x,y)
+a partir da densidade de carga ρ(x,y) na equação de Poisson 2D em eletrostática.
+
+O modelo recebe como entrada os valores de ρ(x,y) em todos os pontos da malha
+de colocação (achatados em um vetor) e devolve os valores de φ(x,y) nos mesmos
+pontos (achatados no mesmo formato).
+
+As coordenadas (x, y) são apenas referência para montar a malha; não entram
+como features de entrada nem como alvos de saída.
 """
 
 import numpy as np
@@ -11,21 +17,23 @@ import torch.nn as nn
 
 class MLP(nn.Module):
     """
-    Multi-Layer Perceptron para prever o potencial elétrico φ(x,y,z) ponto a
-    ponto, a partir das coordenadas espaciais (x, y, z) e da densidade de
-    carga ρ(x,y,z), resolvendo a equação de Poisson 3D em eletrostática.
+    Multi-Layer Perceptron para prever o potencial elétrico φ(x,y) em todos os
+    pontos da malha a partir da densidade de carga ρ(x,y) avaliada na mesma
+    malha.
 
-    Entrada: [x, y, z, ρ(x,y,z)] — 4 features por ponto de colocação.
-    Saída:   φ(x,y,z) — 1 valor por ponto de colocação.
+    Entrada: ρ(x,y) nos N+1 pontos de colocação em cada direção, achatados
+             em um vetor de dimensão (N+1)².
+    Saída:   φ(x,y) nos mesmos pontos, achatados em um vetor de dimensão (N+1)².
     """
 
-    def __init__(self, input_dim=4, hidden_dims=[128, 256, 512], output_dim=1,
+    def __init__(self, input_dim, hidden_dims=[128, 256, 512], output_dim=None,
                  activation='tanh', seed=None):
         """
         Args:
-            input_dim:   dimensão da entrada (4: x, y, z, ρ).
+            input_dim:   dimensão da entrada, igual a (N+1)² (número de pontos
+                         da malha espectral de colocação).
             hidden_dims: dimensões das camadas ocultas.
-            output_dim:  dimensão da saída (1: φ).
+            output_dim:  dimensão da saída; se None, é igual a input_dim.
             activation:  função de ativação ('relu', 'tanh', 'sigmoid').
             seed:        semente para reprodutibilidade.
         """
@@ -38,7 +46,7 @@ class MLP(nn.Module):
                 torch.cuda.manual_seed_all(seed)
 
         if output_dim is None:
-            output_dim = 1
+            output_dim = input_dim
         self.input_dim  = input_dim
         self.output_dim = output_dim
 
@@ -71,71 +79,52 @@ class MLP(nn.Module):
         Forward pass.
 
         Args:
-            x: tensor de entrada (batch_size, 4) — [x, y, z, ρ] por ponto.
+            x: tensor de entrada (batch_size, (N+1)²) — valores de ρ(x,y) nos
+               pontos de colocação, achatados.
 
         Returns:
-            tensor de saída (batch_size, 1) — φ(x,y,z) por ponto.
+            tensor de saída (batch_size, (N+1)²) — valores de φ(x,y) nos
+            mesmos pontos, achatados.
         """
         return self.network(x)
 
-    def predict_potential(self, x, y, z, rho):
+    def predict_potential(self, rho):
         """
-        Prevê o potencial elétrico φ em um conjunto de pontos (x, y, z) para
-        uma dada distribuição de carga ρ avaliada nesses mesmos pontos.
+        Prevê o potencial elétrico φ(x,y) em toda a malha para uma única
+        distribuição de carga ρ(x,y).
 
         Args:
-            x, y, z: coordenadas dos pontos, arrays de shape (n_pontos,) ou
-                     escalares.
-            rho:     valores de ρ nos mesmos pontos, mesmo shape de x/y/z.
+            rho: array de densidade de carga nos pontos de colocação, com
+                 shape (N+1, N+1) ou já achatado em (input_dim,).
 
         Returns:
-            array de φ com o mesmo shape de x/y/z.
+            array de potencial elétrico com o mesmo shape de rho.
         """
         self.eval()
-
-        x_arr   = np.asarray(x).ravel()
-        y_arr   = np.asarray(y).ravel()
-        z_arr   = np.asarray(z).ravel()
-        rho_arr = np.asarray(rho).ravel()
-
-        features = np.column_stack([x_arr, y_arr, z_arr, rho_arr]).astype(np.float32)
-
+        shape_original = np.asarray(rho).shape
         with torch.no_grad():
-            t = torch.tensor(features, dtype=torch.float32)
-            output = self.forward(t).numpy().flatten()
+            x = torch.tensor(np.asarray(rho).ravel(order='F'),
+                             dtype=torch.float32).unsqueeze(0)
+            output = self.forward(x).numpy().flatten()
+        return output.reshape(shape_original, order='F')
 
-        return output.reshape(np.asarray(x).shape)
-
-    def predict_potential_batch(self, x, y, z, rho):
+    def predict_potential_batch(self, rho_batch):
         """
-        Prevê o potencial elétrico φ para múltiplos conjuntos de pontos,
-        cada um associado a uma distribuição de carga ρ diferente.
+        Prevê o potencial elétrico φ(x,y) em toda a malha para múltiplas
+        distribuições de carga ρ(x,y).
 
         Args:
-            x, y, z: coordenadas dos pontos, arrays de shape
-                     (batch_size, n_pontos) ou (batch_size,).
-            rho:     valores de ρ nos mesmos pontos, shape compatível com x/y/z.
+            rho_batch: array de densidade de carga com shape
+                       (batch_size, N+1, N+1) ou (batch_size, input_dim).
 
         Returns:
-            array de φ com o mesmo shape de x/y/z (batch_size, n_pontos).
+            array de potencial elétrico com o mesmo shape de rho_batch.
         """
         self.eval()
-
-        x_arr   = np.asarray(x)
-        y_arr   = np.asarray(y)
-        z_arr   = np.asarray(z)
-        rho_arr = np.asarray(rho)
-
-        # achata para (n_total, 4)
-        features = np.column_stack([
-            x_arr.ravel(),
-            y_arr.ravel(),
-            z_arr.ravel(),
-            rho_arr.ravel(),
-        ]).astype(np.float32)
-
+        shape_original = np.asarray(rho_batch).shape
+        n = shape_original[0]
         with torch.no_grad():
-            t = torch.tensor(features, dtype=torch.float32)
-            outputs = self.forward(t).numpy().flatten()
-
-        return outputs.reshape(x_arr.shape)
+            x = torch.tensor(np.asarray(rho_batch).reshape(n, -1, order='F'),
+                             dtype=torch.float32)
+            outputs = self.forward(x).numpy()
+        return outputs.reshape(shape_original, order='F')

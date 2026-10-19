@@ -1,11 +1,17 @@
 """
-Nodes do pipeline MLP para previsão do potencial elétrico φ(x,y,z) a partir
-da densidade de carga ρ(x,y,z) na equação de Poisson 3D em eletrostática.
+Nodes do pipeline MLP para previsão do potencial elétrico φ(x,y) a partir
+da densidade de carga ρ(x,y) na equação de Poisson 2D em eletrostática.
+
+O modelo recebe como entrada os valores de ρ(x,y) em toda a malha de colocação
+(achatados em um vetor) e devolve os valores de φ(x,y) nos mesmos pontos
+(achatados no mesmo formato). A divisão treino/validação/teste é feita por
+distribuição de carga como amostra completa.
 """
 
 import numpy as np
 import pandas as pd
 import os
+import plotly.graph_objects as go
 import random
 import torch
 import torch.nn as nn
@@ -20,9 +26,6 @@ from .model import MLP
 # from equacao_poisson.pipelines.p00_data_generating.ep import PoissonEletrostatico
 from equacao_poisson.utils import (
     CORES_PALETA,
-    cria_grafico_distribuicao_amplitudes,
-    cria_grafico_distribuicao_dados,
-    cria_grafico_distribuicao_espacial,
     cria_grafico_historico_treinamento,
     cria_grafico_real_previsto_mlp,
     cria_grafico_previsoes_espaco_fases,
@@ -53,14 +56,17 @@ def fixa_sementes(seed: int = 42):
 
 def prepara_dados_mlp_node(base_eletrostatica: pd.DataFrame, parameters: Dict[str, Any]) -> Tuple:
     """
-    Prepara os dados para treinamento do MLP para a equação de Poisson 3D.
+    Prepara os dados para treinamento do MLP para a equação de Poisson 2D.
 
-    Cada ponto da malha de colocação é uma amostra:
-        Entrada: [x, y, z, ρ(x,y,z)]
-        Saída:   φ(x,y,z)
+    Cada distribuição de carga é uma amostra:
+        Entrada: ρ(x,y) em toda a malha, achatado em (N+1)²
+        Saída:   φ(x,y) em toda a malha, achatado em (N+1)²
 
-    A divisão treino/validação/teste é feita sobre os pontos, não sobre
-    as distribuições de carga.
+    Também propaga os parâmetros sorteados de cada carga (amplitude, largura,
+    centro_x, centro_y), que ficam disponíveis para anotar as visualizações
+    posteriores — análogo ao que o caso do oscilador fazia com x0, y0.
+
+    A divisão treino/validação/teste é feita por amostra completa de carga.
     """
     seed = parameters.get('seed', 42)
     fixa_sementes(seed)
@@ -75,10 +81,10 @@ def prepara_dados_mlp_node(base_eletrostatica: pd.DataFrame, parameters: Dict[st
             except Exception:
                 pass
 
-    if base_eletrostatica[['x', 'y', 'z', 'densidade_carga', 'potencial']].isnull().any().any():
+    if base_eletrostatica[['x', 'y', 'densidade_carga', 'potencial']].isnull().any().any():
         print("  AVISO: Valores NaN detectados nas colunas numéricas!")
         base_eletrostatica = base_eletrostatica.dropna(
-            subset=['x', 'y', 'z', 'densidade_carga', 'potencial']
+            subset=['x', 'y', 'densidade_carga', 'potencial']
         )
 
     print(f"\n=== BASE DE DADOS ===")
@@ -89,20 +95,49 @@ def prepara_dados_mlp_node(base_eletrostatica: pd.DataFrame, parameters: Dict[st
 
     print(f"\n=== PREPARAÇÃO DOS DADOS ===")
 
-    # features: x, y, z, ρ(x,y,z)
-    X_raw = base_eletrostatica[['x', 'y', 'z', 'densidade_carga']].values.astype(np.float32)
-    # alvo: φ(x,y,z)
-    y_raw = base_eletrostatica['potencial'].values.astype(np.float32).reshape(-1, 1)
+    # agrupa por carga e achata ρ(x,y) e φ(x,y) de cada uma em vetores
+    # além disso, extrai os parâmetros sorteados da gaussiana de cada carga
+    X_list = []
+    y_list = []
+    params_list = []
 
-    print(f"\n  Pontos válidos: {len(X_raw)}")
-    print(f"  Dimensão entrada: {X_raw.shape[1]} (x, y, z, ρ)")
-    print(f"  Dimensão saída: {y_raw.shape[1]} (φ)")
+    # colunas de parâmetros que serão propagadas (se existirem na base)
+    colunas_param = [c for c in ['amplitude', 'largura', 'centro_x', 'centro_y']
+                     if c in base_eletrostatica.columns]
 
-    # divisão ponto a ponto (70/20/10)
-    n_pontos = len(X_raw)
-    indices = np.random.permutation(n_pontos)
-    n_train = int(0.7 * n_pontos)
-    n_val   = int(0.2 * n_pontos)
+    for carga_id in cargas_unicas:
+        grupo = base_eletrostatica[base_eletrostatica['carga_id'] == carga_id]
+        grupo = grupo.sort_values(['x_col', 'y_col'])
+
+        rho_carga = grupo['densidade_carga'].values.astype(np.float32)
+        phi_carga = grupo['potencial'].values.astype(np.float32)
+
+        X_list.append(rho_carga)
+        y_list.append(phi_carga)
+
+        # extrai os parâmetros da primeira linha do grupo (idênticos em todas)
+        if colunas_param:
+            primeira_linha = grupo.iloc[0]
+            params_carga = {c: primeira_linha[c] for c in colunas_param}
+        else:
+            params_carga = {}
+        params_list.append(params_carga)
+
+    X_raw = np.array(X_list, dtype=np.float32)   # (n_cargas, (N+1)²)
+    y_raw = np.array(y_list, dtype=np.float32)   # (n_cargas, (N+1)²)
+    params_df = pd.DataFrame(params_list)        # (n_cargas, n_parametros)
+
+    print(f"\n  Distribuições válidas: {len(X_raw)}")
+    print(f"  Dimensão entrada: {X_raw.shape[1]} (pontos de colocação)")
+    print(f"  Dimensão saída: {y_raw.shape[1]} (pontos de colocação)")
+    if colunas_param:
+        print(f"  Parâmetros propagados por carga: {colunas_param}")
+
+    # divisão por carga (70/20/10)
+    n_cargas = len(X_raw)
+    indices = np.random.permutation(n_cargas)
+    n_train = int(0.7 * n_cargas)
+    n_val   = int(0.2 * n_cargas)
 
     train_indices = indices[:n_train]
     val_indices   = indices[n_train:n_train + n_val]
@@ -115,19 +150,43 @@ def prepara_dados_mlp_node(base_eletrostatica: pd.DataFrame, parameters: Dict[st
     X_test  = X_raw[test_indices]
     y_test  = y_raw[test_indices]
 
-    print(f"\n  Pontos de treino: {len(X_train)}")
-    print(f"  Pontos de validação: {len(X_val)}")
-    print(f"  Pontos de teste: {len(X_test)}")
+    cargas_train = np.array(cargas_unicas)[train_indices]
+    cargas_val   = np.array(cargas_unicas)[val_indices]
+    cargas_test  = np.array(cargas_unicas)[test_indices]
 
-    # normalização
+    # separa os parâmetros por conjunto, na mesma ordem das cargas
+    params_train = params_df.iloc[train_indices].reset_index(drop=True)
+    params_val   = params_df.iloc[val_indices].reset_index(drop=True)
+    params_test  = params_df.iloc[test_indices].reset_index(drop=True)
+
+    print(f"\n  Cargas de treino: {len(X_train)}")
+    print(f"  Cargas de validação: {len(X_val)}")
+    print(f"  Cargas de teste: {len(X_test)}")
+
+    # -------------------------------------------------------------
+    # Normalização com tratamento de colunas de variância zero
+    # -------------------------------------------------------------
     scaler_X = StandardScaler()
-    scaler_y = StandardScaler()
+    scaler_X.fit(X_train)
+    zero_scale_X = (scaler_X.scale_ == 0)
+    if zero_scale_X.any():
+        print(f"  AVISO: {zero_scale_X.sum()} colunas de X têm variância zero. "
+              f"Ajustando scale para 1.0.")
+        scaler_X.scale_[zero_scale_X] = 1.0
 
-    X_scaled_train = scaler_X.fit_transform(X_train)
+    scaler_y = StandardScaler()
+    scaler_y.fit(y_train)
+    zero_scale_y = (scaler_y.scale_ == 0)
+    if zero_scale_y.any():
+        print(f"  AVISO: {zero_scale_y.sum()} colunas de y têm variância zero. "
+              f"Ajustando scale para 1.0.")
+        scaler_y.scale_[zero_scale_y] = 1.0
+
+    X_scaled_train = scaler_X.transform(X_train)
     X_scaled_val   = scaler_X.transform(X_val)
     X_scaled_test  = scaler_X.transform(X_test)
 
-    y_scaled_train = scaler_y.fit_transform(y_train)
+    y_scaled_train = scaler_y.transform(y_train)
     y_scaled_val   = scaler_y.transform(y_val)
     y_scaled_test  = scaler_y.transform(y_test)
 
@@ -141,8 +200,9 @@ def prepara_dados_mlp_node(base_eletrostatica: pd.DataFrame, parameters: Dict[st
             X_scaled_val, y_scaled_val,
             X_scaled_test, y_scaled_test,
             input_dim, output_dim, scaler_X, scaler_y,
-            cargas_unicas, cargas_unicas, cargas_unicas,
-            n_pontos)
+            cargas_train, cargas_val, cargas_test,
+            params_train, params_val, params_test,
+            n_cargas)
 
 
 def visualiza_distribuicao_dados_separado(
@@ -150,16 +210,11 @@ def visualiza_distribuicao_dados_separado(
     parameters: Dict[str, Any]
 ) -> None:
     """
-    Node separado para visualizar a distribuição dos dados de carga e potencial.
+    Node separado para visualizar a distribuição dos dados.
 
-    Carrega a base consolidada, calcula estatísticas das amplitudes de ρ e φ
-    e gera gráficos de distribuição. A divisão treino/validação/teste é feita
-    ponto a ponto (cada ponto da malha é uma amostra), coerente com o
-    prepara_dados_mlp_node.
-
-    Args:
-        base_eletrostatica: DataFrame com a base consolidada.
-        parameters: Parâmetros do pipeline.
+    Carrega a base consolidada, calcula amplitudes de ρ e φ por carga e gera
+    um gráfico das cargas por conjunto (treino/validação/teste) em função
+    da amplitude de ρ, para checar balanceamento da divisão.
     """
     data_version = parameters.get('data_version', 'default_v1')
     output_dir = f"data/08_reporting/{data_version}"
@@ -174,7 +229,7 @@ def visualiza_distribuicao_dados_separado(
 
     cargas_unicas = base_eletrostatica['carga_id'].unique()
 
-    # amplitudes por carga (usadas apenas como estatística descritiva)
+    # amplitudes por carga
     amplitudes_carga = {}
     amplitudes_potencial = {}
     for carga_id in cargas_unicas:
@@ -189,95 +244,91 @@ def visualiza_distribuicao_dados_separado(
     amplitudes_pot_ordenadas = [t[1] for t in cargas_ordenadas_pot]
 
     print(f"\n=== DISTRIBUIÇÃO DAS CARGAS POR AMPLITUDE ===")
-    print(f"  Amplitude de ρ mínima: {amplitudes_carga_ordenadas[0]:.4f}")
-    print(f"  Amplitude de ρ máxima: {amplitudes_carga_ordenadas[-1]:.4f}")
-    print(f"  Amplitude de ρ mediana: {amplitudes_carga_ordenadas[len(amplitudes_carga_ordenadas)//2]:.4f}")
+    print(f"  Amplitude de ρ mínima: {amplitudes_carga_ordenadas[0]:.4e}")
+    print(f"  Amplitude de ρ máxima: {amplitudes_carga_ordenadas[-1]:.4e}")
+    print(f"  Amplitude de ρ mediana: {amplitudes_carga_ordenadas[len(amplitudes_carga_ordenadas)//2]:.4e}")
 
     print(f"\n=== DISTRIBUIÇÃO DOS POTENCIAIS POR AMPLITUDE ===")
-    print(f"  Amplitude de φ mínima: {amplitudes_pot_ordenadas[0]:.4f}")
-    print(f"  Amplitude de φ máxima: {amplitudes_pot_ordenadas[-1]:.4f}")
-    print(f"  Amplitude de φ mediana: {amplitudes_pot_ordenadas[len(amplitudes_pot_ordenadas)//2]:.4f}")
+    print(f"  Amplitude de φ mínima: {amplitudes_pot_ordenadas[0]:.4e}")
+    print(f"  Amplitude de φ máxima: {amplitudes_pot_ordenadas[-1]:.4e}")
+    print(f"  Amplitude de φ mediana: {amplitudes_pot_ordenadas[len(amplitudes_pot_ordenadas)//2]:.4e}")
 
-    # gráfico de distribuição de amplitudes de ρ
-    fig_carga = cria_grafico_distribuicao_amplitudes(
-        amplitudes=np.array(amplitudes_carga_ordenadas),
-        titulo="Distribuição das Amplitudes de Carga — Equação de Poisson 3D",
-    )
-    fig_carga.write_html(f"{output_dir}/distribuicao_amplitudes_carga.html")
-    fig_carga.show()
-
-    # gráfico de distribuição de amplitudes de φ
-    fig_pot = cria_grafico_distribuicao_amplitudes(
-        amplitudes=np.array(amplitudes_pot_ordenadas),
-        titulo="Distribuição das Amplitudes de Potencial — Equação de Poisson 3D",
-    )
-    fig_pot.write_html(f"{output_dir}/distribuicao_amplitudes_potencial.html")
-    fig_pot.show()
-
-    # divisão ponto a ponto (70/20/10) — coerente com o prepara_dados_mlp_node
-    n_pontos = len(base_eletrostatica)
-    indices = np.random.RandomState(42).permutation(n_pontos)
-    n_train = int(0.7 * n_pontos)
-    n_val   = int(0.2 * n_pontos)
+    # divisão por carga (70/20/10)
+    n_cargas = len(cargas_unicas)
+    indices = np.random.RandomState(42).permutation(n_cargas)
+    n_train = int(0.7 * n_cargas)
+    n_val   = int(0.2 * n_cargas)
 
     train_indices = indices[:n_train]
     val_indices   = indices[n_train:n_train + n_val]
     test_indices  = indices[n_train + n_val:]
 
-    dados_train = base_eletrostatica.iloc[train_indices]
-    dados_val   = base_eletrostatica.iloc[val_indices]
-    dados_test  = base_eletrostatica.iloc[test_indices]
+    cargas_train = cargas_unicas[train_indices]
+    cargas_val   = cargas_unicas[val_indices]
+    cargas_test  = cargas_unicas[test_indices]
 
-    print(f"\n=== DIVISÃO DOS DADOS (POR PONTO) ===")
-    print(f"  Pontos de treino: {len(dados_train)}")
-    print(f"  Pontos de validação: {len(dados_val)}")
-    print(f"  Pontos de teste: {len(dados_test)}")
+    print(f"\n=== DIVISÃO DOS DADOS (POR CARGA) ===")
+    print(f"  Cargas de treino: {len(cargas_train)}")
+    print(f"  Cargas de validação: {len(cargas_val)}")
+    print(f"  Cargas de teste: {len(cargas_test)}")
 
-    y_carga_train = dados_train['densidade_carga'].values.astype(np.float32).reshape(-1, 1)
-    y_carga_val   = dados_val['densidade_carga'].values.astype(np.float32).reshape(-1, 1)
-    y_carga_test  = dados_test['densidade_carga'].values.astype(np.float32).reshape(-1, 1)
+    fig = go.Figure()
 
-    y_pot_train = dados_train['potencial'].values.astype(np.float32).reshape(-1, 1)
-    y_pot_val   = dados_val['potencial'].values.astype(np.float32).reshape(-1, 1)
-    y_pot_test  = dados_test['potencial'].values.astype(np.float32).reshape(-1, 1)
+    fig.add_trace(go.Scatter(
+        x=[int(c) for c in cargas_train],
+        y=[amplitudes_carga[c] for c in cargas_train],
+        mode='markers',
+        name=f'Treino ({len(cargas_train)})',
+        marker=dict(color='#2E7D32', size=10, symbol='circle'),
+        hovertemplate="Carga: %{x}<br>Amplitude ρ: %{y:.4e}<extra></extra>"
+    ))
 
-    # gráfico de distribuição conjunta (ρ e φ por conjunto)
-    fig_dist = cria_grafico_distribuicao_dados(
-        y_carga_train=y_carga_train, y_pot_train=y_pot_train,
-        y_carga_val=y_carga_val,     y_pot_val=y_pot_val,
-        y_carga_test=y_carga_test,   y_pot_test=y_pot_test,
-        titulo="Distribuição dos Dados — Equação de Poisson 3D",
+    fig.add_trace(go.Scatter(
+        x=[int(c) for c in cargas_val],
+        y=[amplitudes_carga[c] for c in cargas_val],
+        mode='markers',
+        name=f'Validação ({len(cargas_val)})',
+        marker=dict(color='#0D47A1', size=10, symbol='square'),
+        hovertemplate="Carga: %{x}<br>Amplitude ρ: %{y:.4e}<extra></extra>"
+    ))
+
+    fig.add_trace(go.Scatter(
+        x=[int(c) for c in cargas_test],
+        y=[amplitudes_carga[c] for c in cargas_test],
+        mode='markers',
+        name=f'Teste ({len(cargas_test)})',
+        marker=dict(color='#F57F17', size=10, symbol='diamond'),
+        hovertemplate="Carga: %{x}<br>Amplitude ρ: %{y:.4e}<extra></extra>"
+    ))
+
+    fig.update_layout(
+        title=dict(
+            text=f"<span style='font-size:20px; font-weight:bold;'>"
+                 f"Distribuição de Cargas por Conjunto</span><br><br>"
+                 f"<span style='font-size:16px; color:#555555;'>"
+                 f"Total: {n_cargas} distribuições de cargas | "
+                 f"Treino: {len(cargas_train)} | "
+                 f"Validação: {len(cargas_val)} | "
+                 f"Teste: {len(cargas_test)}</span>",
+            x=0.5, y=0.95, font=dict(size=20)
+        ),
+        xaxis_title="ID da carga",
+        yaxis_title="Amplitude Máxima de ρ",
+        width=1400,
+        height=700,
+        hovermode='closest',
+        plot_bgcolor='white',
+        margin=dict(t=140),
     )
-    fig_dist.write_html(f"{output_dir}/distribuicao_dados.html")
-    fig_dist.show()
 
-    # gráfico de distribuição espacial dos pontos
-    x_train = dados_train['x'].values.astype(np.float32).reshape(-1, 1)
-    y_train = dados_train['y'].values.astype(np.float32).reshape(-1, 1)
-    z_train = dados_train['z'].values.astype(np.float32).reshape(-1, 1)
-
-    x_val = dados_val['x'].values.astype(np.float32).reshape(-1, 1)
-    y_val = dados_val['y'].values.astype(np.float32).reshape(-1, 1)
-    z_val = dados_val['z'].values.astype(np.float32).reshape(-1, 1)
-
-    x_test = dados_test['x'].values.astype(np.float32).reshape(-1, 1)
-    y_test = dados_test['y'].values.astype(np.float32).reshape(-1, 1)
-    z_test = dados_test['z'].values.astype(np.float32).reshape(-1, 1)
-
-    fig_esp = cria_grafico_distribuicao_espacial(
-        x_train=x_train, y_train=y_train, z_train=z_train,
-        x_val=x_val,     y_val=y_val,     z_val=z_val,
-        x_test=x_test,   y_test=y_test,   z_test=z_test,
-        titulo="Distribuição Espacial dos Pontos — Treino / Validação / Teste",
-    )
-    fig_esp.write_html(f"{output_dir}/distribuicao_espacial_pontos.html")
-    fig_esp.show()
+    fig.write_html(f"{output_dir}/distribuicao_cargas_conjuntos.html")
+    fig.show()
 
     return None
 
 
 def cria_modelo_mlp_node(input_dim: int, output_dim: int, parameters: Dict[str, Any]) -> nn.Module:
-    """Cria o modelo MLP para previsão do potencial elétrico φ(x,y,z) a partir de [x, y, z, ρ(x,y,z)]."""
+    """Cria o modelo MLP para previsão do potencial elétrico φ(x,y) em toda a malha a partir de ρ(x,y)."""
 
     mlp_config = parameters.get('mlp', {})
     seed = parameters.get('seed', 42)
@@ -296,9 +347,9 @@ def cria_modelo_mlp_node(input_dim: int, output_dim: int, parameters: Dict[str, 
     )
 
     print("\n=== MODELO MLP CRIADO ===")
-    print(f"  Dimensão entrada: {input_dim} (x, y, z, ρ)")
+    print(f"  Dimensão entrada: {input_dim} (pontos de colocação da malha)")
     print(f"  Camadas ocultas: {hidden_dims}")
-    print(f"  Dimensão saída: {output_dim} (φ)")
+    print(f"  Dimensão saída: {output_dim} (pontos de colocação da malha)")
     print(f"  Parâmetros treináveis: {sum(p.numel() for p in model.parameters() if p.requires_grad)}")
     print(f"  Função de ativação: {activation.capitalize()}")
 
@@ -313,12 +364,12 @@ def treina_mlp_node(
     y_val: np.ndarray,
     parameters: Dict[str, Any]
 ) -> Tuple[nn.Module, Dict]:
-    """Treina o modelo MLP para prever o potencial elétrico φ(x,y,z) a partir de [x, y, z, ρ(x,y,z)]."""
+    """Treina o modelo MLP para prever φ(x,y) em toda a malha a partir de ρ(x,y)."""
 
     mlp_config = parameters.get('mlp', {})
     seed = parameters.get('seed', 42)
 
-    batch_size    = mlp_config.get('batch_size', 512)
+    batch_size    = mlp_config.get('batch_size', 16)
     epochs        = mlp_config.get('epochs', 500)
     learning_rate = mlp_config.get('learning_rate', 0.005)
     weight_decay  = mlp_config.get('weight_decay', 0.0001)
@@ -367,7 +418,7 @@ def treina_mlp_node(
     }
 
     print("\n=== INICIANDO TREINAMENTO DO MLP ===")
-    print(f"  Entrada: [x, y, z, ρ] -> Saída: φ")
+    print(f"  Entrada: ρ(x,y) em toda a malha -> Saída: φ(x,y) em toda a malha")
     print(f"  Batch size: {batch_size}")
     print(f"  Epochs: {epochs}")
     print(f"  Learning rate: {learning_rate}")
@@ -420,7 +471,7 @@ def treina_mlp_node(
 
     fig = cria_grafico_historico_treinamento(
         history=history,
-        titulo="Evolução da Função de Custo durante o Treinamento do MLP - Equação de Poisson 3D"
+        titulo="Evolução da Função de Custo durante o Treinamento do MLP - Equação de Poisson 2D"
     )
 
     fig.write_html(grafico_historico_loss)
@@ -443,10 +494,10 @@ def avalia_metricas_mlp_node(
     scaler_y: StandardScaler,
 ) -> Dict[str, float]:
     """
-    Avalia o modelo MLP nos dados de validação e teste para a equação de Poisson 3D.
+    Avalia o modelo MLP nos dados de validação e teste para a equação de Poisson 2D.
 
-    Avalia ponto a ponto o potencial elétrico φ(x,y,z) previsto pelo modelo
-    contra o potencial de referência (solução espectral).
+    Avalia o potencial elétrico φ(x,y) previsto pelo modelo em toda a malha
+    contra o potencial de referência (solução espectral), amostra a amostra.
     """
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -466,7 +517,7 @@ def avalia_metricas_mlp_node(
     predictions_test = scaler_y.inverse_transform(predictions_scaled_test)
     y_test_original  = scaler_y.inverse_transform(y_test)
 
-    # avalia ponto a ponto
+    # avalia sobre toda a malha
     rmse_val  = float(np.sqrt(mean_squared_error(y_val_original.flatten(),  predictions_val.flatten())))
     r2_val    = float(r2_score(y_val_original.flatten(), predictions_val.flatten()))
 
@@ -485,7 +536,7 @@ def avalia_metricas_mlp_node(
         'erro_max_test': erro_max_test,
     }
 
-    print("\n=== AVALIAÇÃO DO MODELO MLP - EQUAÇÃO DE POISSON 3D ===")
+    print("\n=== AVALIAÇÃO DO MODELO MLP - EQUAÇÃO DE POISSON 2D ===")
     print(f"  RMSE Validação: {rmse_val:.6e}")
     print(f"  R²   Validação: {r2_val:.4f}")
     print(f"  Erro máx. Validação: {erro_max_val:.6e}")
@@ -505,12 +556,12 @@ def visualiza_previsoes_mlp_node(
 ) -> None:
     """
     Visualiza as previsões do modelo MLP nos dados de teste.
-    Compara o potencial elétrico previsto com o de referência ponto a ponto.
+    Compara o potencial elétrico previsto com o de referência em toda a malha.
 
     Args:
         model: Modelo treinado
-        X_test: Dados de teste (features [x, y, z, ρ] por ponto)
-        y_test: Targets de teste (potenciais φ de referência)
+        X_test: Dados de teste (ρ(x,y) em toda a malha, achatado)
+        y_test: Targets de teste (potenciais φ(x,y) de referência, achatados)
         scaler_y: Scaler dos targets
         parameters: Parâmetros do pipeline
     """
@@ -536,14 +587,14 @@ def visualiza_previsoes_mlp_node(
     predictions     = scaler_y.inverse_transform(predictions_scaled)
     y_test_original = scaler_y.inverse_transform(y_test)
 
-    # achata todos os pontos para visualização (já estão ponto a ponto)
+    # achata toda a malha para visualização ponto a ponto
     predictions_flat = predictions.flatten().reshape(-1, 1)
     y_true_flat      = y_test_original.flatten().reshape(-1, 1)
 
     fig = cria_grafico_real_previsto_mlp(
         predictions=predictions_flat,
         y_true=y_true_flat,
-        titulo="Real vs Previsto - Equação de Poisson 3D (Dados de Teste)"
+        titulo="Real vs Previsto - Equação de Poisson 2D (Dados de Teste)"
     )
 
     fig.write_html(grafico_previsoes_mlp)
@@ -557,23 +608,16 @@ def visualiza_previsoes_espaco_fases_node(
     X_test: np.ndarray,
     y_test: np.ndarray,
     scaler_y: StandardScaler,
+    params_test: pd.DataFrame,
     parameters: Dict[str, Any]
 ) -> None:
     """
-    Node: Visualiza as previsões do modelo em gráfico de dispersão (real vs previsto)
-    para o potencial elétrico φ(x,y,z), destacando erro ponto a ponto.
-
-    Args:
-        model: Modelo treinado
-        X_test: Dados de teste (features [x, y, z, ρ] por ponto)
-        y_test: Targets de teste (potenciais φ de referência)
-        scaler_y: Scaler dos targets
-        parameters: Parâmetros do pipeline
+    Node: Visualiza as previsões do modelo para o potencial elétrico φ(x,y)
+    como uma malha 2D completa por carga, anotando os parâmetros sorteados
+    da gaussiana em cada carga (amplitude, largura, centros).
     """
-
     exp_name     = parameters.get('exp_name', 'default_exp')
     data_version = parameters.get('data_version', 'default_v1')
-    seed         = parameters.get('seed', 42)
 
     output_dir = f"data/08_reporting/{exp_name}/{data_version}"
     os.makedirs(output_dir, exist_ok=True)
@@ -584,33 +628,49 @@ def visualiza_previsoes_espaco_fases_node(
     model = model.to(device)
     model.eval()
 
+    n_pontos = X_test.shape[1]
+    N_plus_1 = int(np.sqrt(n_pontos))
+    if N_plus_1 * N_plus_1 != n_pontos:
+        raise ValueError(
+            f"X_test.shape[1] = {n_pontos} não é um quadrado perfeito. "
+            f"Esperado (N+1)² para a malha 2D."
+        )
+    N = N_plus_1 - 1
+
+    dom = parameters['solver']['dominio']
+    x_grid = np.linspace(dom['xmin'], dom['xmax'], N_plus_1)
+    y_grid = np.linspace(dom['ymin'], dom['ymax'], N_plus_1)
+
     print("\n=== VISUALIZAÇÃO DAS PREVISÕES ===")
-    print(f"  Número de pontos de teste: {len(X_test)}")
+    print(f"  Número de cargas de teste: {len(X_test)}")
+    print(f"  Pontos por carga: {n_pontos}  →  malha {N_plus_1} × {N_plus_1}")
 
     X_test_tensor = torch.tensor(X_test, dtype=torch.float32).to(device)
 
     with torch.no_grad():
         predictions_scaled = model(X_test_tensor).cpu().numpy()
 
-    # desnormaliza previsões
     predictions     = scaler_y.inverse_transform(predictions_scaled)
     y_test_original = scaler_y.inverse_transform(y_test)
 
-    # achata todos os pontos para visualização
-    y_true_flat = y_test_original.flatten().reshape(-1, 1)
-    y_pred_flat = predictions.flatten().reshape(-1, 1)
+    n_cargas = predictions.shape[0]
+    phi_pred = np.array([predictions[i].reshape(N_plus_1, N_plus_1, order='F')
+                         for i in range(n_cargas)])
+    phi_true = np.array([y_test_original[i].reshape(N_plus_1, N_plus_1, order='F')
+                         for i in range(n_cargas)])
 
-    # calcula métricas para exibição
-    rmse = np.sqrt(mean_squared_error(y_true_flat, y_pred_flat))
-    r2   = r2_score(y_true_flat, y_pred_flat)
-
-    print(f"  RMSE: {rmse:.6e}")
-    print(f"  R²:   {r2:.4f}")
+    # ρ reshaped para (n_cargas, N+1, N+1)
+    rho_inputs = np.array([X_test[i].reshape(N_plus_1, N_plus_1, order='F')
+                           for i in range(n_cargas)])
 
     fig = cria_grafico_previsoes_espaco_fases(
-        y_true=y_true_flat,
-        y_pred=y_pred_flat,
-        titulo="Previsões do Modelo - Equação de Poisson 3D"
+        phi_pred=phi_pred,
+        phi_true=phi_true,
+        rho_inputs=rho_inputs,
+        parametros_cargas=params_test,
+        x_grid=x_grid,
+        y_grid=y_grid,
+        titulo="Previsões do Modelo — Equação de Poisson 2D"
     )
 
     fig.write_html(grafico_previsoes_espaco_fases)
