@@ -1,11 +1,10 @@
 """
-Nodes do pipeline MLP para previsão do potencial elétrico φ(x,y) a partir
-da densidade de carga ρ(x,y) na equação de Poisson 2D em eletrostática.
+Nodes do pipeline MLP para previsão do potencial elétrico φ̃(x,y) a partir
+da densidade de carga ρ̃(x,y) na equação de Poisson 2D em eletrostática.
 
-O modelo recebe como entrada os valores de ρ(x,y) em toda a malha de colocação
-(achatados em um vetor) e devolve os valores de φ(x,y) nos mesmos pontos
-(achatados no mesmo formato). A divisão treino/validação/teste é feita por
-distribuição de carga como amostra completa.
+O modelo recebe como entrada os valores de ρ̃(x,y) em toda a malha de integração
+numérica e devolve os valores de φ̃(x,y) nos mesmos pontos. A divisão 
+treino/validação/teste é feita por distribuição de carga como amostra completa.
 """
 
 import numpy as np
@@ -26,9 +25,11 @@ from .model import MLP
 # from equacao_poisson.pipelines.p00_data_generating.ep import PoissonEletrostatico
 from equacao_poisson.utils import (
     CORES_PALETA,
+    cria_grafico_distribuicao_max_rho,
+    cria_grafico_distribuicao_cargas,
     cria_grafico_historico_treinamento,
-    cria_grafico_real_previsto_mlp,
     cria_grafico_previsoes_espaco_fases,
+    cria_grafico_real_previsto_mlp,
     # cria_grafico_interpolacao_completo,
     # cria_grafico_interpolacao_espaco_fases,
     # cria_grafico_interpolacao_pontual_mlp,
@@ -56,15 +57,12 @@ def fixa_sementes(seed: int = 42):
 
 def prepara_dados_mlp_node(base_eletrostatica: pd.DataFrame, parameters: Dict[str, Any]) -> Tuple:
     """
-    Prepara os dados para treinamento do MLP para a equação de Poisson 2D.
+    Prepara os dados para treinamento do MLP para a equação de Poisson 2D
+    adimensional.
 
     Cada distribuição de carga é uma amostra:
-        Entrada: ρ(x,y) em toda a malha, achatado em (N+1)²
-        Saída:   φ(x,y) em toda a malha, achatado em (N+1)²
-
-    Também propaga os parâmetros sorteados de cada carga (amplitude, largura,
-    centro_x, centro_y), que ficam disponíveis para anotar as visualizações
-    posteriores — análogo ao que o caso do oscilador fazia com x0, y0.
+        Entrada: ρ̃(x,y) em toda a malha, (N+1)²
+        Saída:   φ̃(x,y) em toda a malha, (N+1)²
 
     A divisão treino/validação/teste é feita por amostra completa de carga.
     """
@@ -95,7 +93,7 @@ def prepara_dados_mlp_node(base_eletrostatica: pd.DataFrame, parameters: Dict[st
 
     print(f"\n=== PREPARAÇÃO DOS DADOS ===")
 
-    # agrupa por carga e achata ρ(x,y) e φ(x,y) de cada uma em vetores
+    # agrupa por carga e achata ρ̃(x,y) e φ̃(x,y) de cada uma em vetores
     # além disso, extrai os parâmetros sorteados da gaussiana de cada carga
     X_list = []
     y_list = []
@@ -164,7 +162,7 @@ def prepara_dados_mlp_node(base_eletrostatica: pd.DataFrame, parameters: Dict[st
     print(f"  Cargas de teste: {len(X_test)}")
 
     # -------------------------------------------------------------
-    # Normalização com tratamento de colunas de variância zero
+    # normalização com tratamento de colunas de variância zero
     # -------------------------------------------------------------
     scaler_X = StandardScaler()
     scaler_X.fit(X_train)
@@ -205,16 +203,13 @@ def prepara_dados_mlp_node(base_eletrostatica: pd.DataFrame, parameters: Dict[st
             n_cargas)
 
 
-def visualiza_distribuicao_dados_separado(
+def visualiza_distribuicao_max_rho_node(
     base_eletrostatica: pd.DataFrame,
     parameters: Dict[str, Any]
 ) -> None:
     """
-    Node separado para visualizar a distribuição dos dados.
-
-    Carrega a base consolidada, calcula amplitudes de ρ e φ por carga e gera
-    um gráfico das cargas por conjunto (treino/validação/teste) em função
-    da amplitude de ρ, para checar balanceamento da divisão.
+    Node: gera o gráfico da distribuição espacial (centro_x, centro_y) dos
+    valores máximos de ρ̃ para cada conjunto (treino/validação/teste).
     """
     data_version = parameters.get('data_version', 'default_v1')
     output_dir = f"data/08_reporting/{data_version}"
@@ -228,8 +223,81 @@ def visualiza_distribuicao_dados_separado(
                 pass
 
     cargas_unicas = base_eletrostatica['carga_id'].unique()
+    n_cargas = len(cargas_unicas)
 
-    # amplitudes por carga
+    # amplitude máxima de ρ̃ por carga
+    amplitudes_carga = {}
+    for carga_id in cargas_unicas:
+        grupo = base_eletrostatica[base_eletrostatica['carga_id'] == carga_id]
+        amplitudes_carga[carga_id] = np.max(np.abs(grupo['densidade_carga'].values))
+
+    # divisão por carga (70/20/10)
+    indices = np.random.RandomState(42).permutation(n_cargas)
+    n_train = int(0.7 * n_cargas)
+    n_val   = int(0.2 * n_cargas)
+
+    train_indices = indices[:n_train]
+    val_indices   = indices[n_train:n_train + n_val]
+    test_indices  = indices[n_train + n_val:]
+
+    cargas_train = cargas_unicas[train_indices]
+    cargas_val   = cargas_unicas[val_indices]
+    cargas_test  = cargas_unicas[test_indices]
+
+    print(f"\n=== DISTRIBUIÇÃO DOS MÁXIMOS DE DENSIDADE DE CARGA ===")
+    print(f"  Total de Cargas: {n_cargas}")
+    print(f"  Treino: {len(cargas_train)} | "
+          f"Validação: {len(cargas_val)} | "
+          f"Teste: {len(cargas_test)}")
+
+    # parâmetros de cada carga: (centro_x, centro_y)
+    parametros_carga = (
+        base_eletrostatica
+        .groupby('carga_id')[['centro_x', 'centro_y']]
+        .first()
+    )
+
+    fig = cria_grafico_distribuicao_max_rho(
+        cargas_train=cargas_train,
+        cargas_val=cargas_val,
+        cargas_test=cargas_test,
+        parametros_carga=parametros_carga,
+        amplitudes_carga=amplitudes_carga,
+        titulo="Distribuição das Amplitudes Máximas de Densidade de Carga por Conjunto",
+    )
+
+    fig.write_html(f"{output_dir}/distribuicao_max_rho.png.html")
+    fig.show()
+
+    return None
+
+
+def visualiza_distribuicao_dados_separado(
+    base_eletrostatica: pd.DataFrame,
+    parameters: Dict[str, Any]
+) -> None:
+    """
+    Node para visualizar a distribuição dos dados.
+
+    Carrega a base consolidada, calcula amplitudes de ρ̃ e φ̃ por carga,
+    faz a divisão treino/validação/teste por carga e gera um gráfico com
+    o heatmap de ρ̃(x,y) de cada carga, com os centros de todas as cargas
+    sobrepostos e diferenciados por conjunto.
+    """
+    data_version = parameters.get('data_version', 'default_v1')
+    output_dir = f"data/08_reporting/{data_version}"
+    os.makedirs(output_dir, exist_ok=True)
+
+    for col in base_eletrostatica.columns:
+        if base_eletrostatica[col].dtype == 'object':
+            try:
+                base_eletrostatica[col] = base_eletrostatica[col].astype(str).str.replace(',', '.').astype(float)
+            except Exception:
+                pass
+
+    cargas_unicas = base_eletrostatica['carga_id'].unique()
+    n_cargas = len(cargas_unicas)
+
     amplitudes_carga = {}
     amplitudes_potencial = {}
     for carga_id in cargas_unicas:
@@ -244,17 +312,16 @@ def visualiza_distribuicao_dados_separado(
     amplitudes_pot_ordenadas = [t[1] for t in cargas_ordenadas_pot]
 
     print(f"\n=== DISTRIBUIÇÃO DAS CARGAS POR AMPLITUDE ===")
-    print(f"  Amplitude de ρ mínima: {amplitudes_carga_ordenadas[0]:.4e}")
-    print(f"  Amplitude de ρ máxima: {amplitudes_carga_ordenadas[-1]:.4e}")
-    print(f"  Amplitude de ρ mediana: {amplitudes_carga_ordenadas[len(amplitudes_carga_ordenadas)//2]:.4e}")
+    print(f"  Amplitude de ρ̃ mínima: {amplitudes_carga_ordenadas[0]:.4e}")
+    print(f"  Amplitude de ρ̃ máxima: {amplitudes_carga_ordenadas[-1]:.4e}")
+    print(f"  Amplitude de ρ̃ mediana: {amplitudes_carga_ordenadas[len(amplitudes_carga_ordenadas)//2]:.4e}")
 
     print(f"\n=== DISTRIBUIÇÃO DOS POTENCIAIS POR AMPLITUDE ===")
-    print(f"  Amplitude de φ mínima: {amplitudes_pot_ordenadas[0]:.4e}")
-    print(f"  Amplitude de φ máxima: {amplitudes_pot_ordenadas[-1]:.4e}")
-    print(f"  Amplitude de φ mediana: {amplitudes_pot_ordenadas[len(amplitudes_pot_ordenadas)//2]:.4e}")
+    print(f"  Amplitude de φ̃ mínima: {amplitudes_pot_ordenadas[0]:.4e}")
+    print(f"  Amplitude de φ̃ máxima: {amplitudes_pot_ordenadas[-1]:.4e}")
+    print(f"  Amplitude de φ̃ mediana: {amplitudes_pot_ordenadas[len(amplitudes_pot_ordenadas)//2]:.4e}")
 
     # divisão por carga (70/20/10)
-    n_cargas = len(cargas_unicas)
     indices = np.random.RandomState(42).permutation(n_cargas)
     n_train = int(0.7 * n_cargas)
     n_val   = int(0.2 * n_cargas)
@@ -267,58 +334,48 @@ def visualiza_distribuicao_dados_separado(
     cargas_val   = cargas_unicas[val_indices]
     cargas_test  = cargas_unicas[test_indices]
 
-    print(f"\n=== DIVISÃO DOS DADOS (POR CARGA) ===")
+    print(f"\n=== DIVISÃO DOS DADOS ===")
     print(f"  Cargas de treino: {len(cargas_train)}")
     print(f"  Cargas de validação: {len(cargas_val)}")
     print(f"  Cargas de teste: {len(cargas_test)}")
 
-    fig = go.Figure()
+    n_pontos_por_carga = len(base_eletrostatica) // n_cargas
+    N_plus_1 = int(np.sqrt(n_pontos_por_carga))
+    if N_plus_1 * N_plus_1 != n_pontos_por_carga:
+        raise ValueError(
+            f"n_pontos_por_carga = {n_pontos_por_carga} não é quadrado perfeito. "
+            f"Esperado (N+1)²."
+        )
 
-    fig.add_trace(go.Scatter(
-        x=[int(c) for c in cargas_train],
-        y=[amplitudes_carga[c] for c in cargas_train],
-        mode='markers',
-        name=f'Treino ({len(cargas_train)})',
-        marker=dict(color='#2E7D32', size=10, symbol='circle'),
-        hovertemplate="Carga: %{x}<br>Amplitude ρ: %{y:.4e}<extra></extra>"
-    ))
+    grupo0 = base_eletrostatica[base_eletrostatica['carga_id'] == cargas_unicas[0]]
+    grupo0 = grupo0.sort_values(['x_col', 'y_col'])
+    grid_x = grupo0['x'].unique()
+    grid_y = grupo0['y'].unique()
 
-    fig.add_trace(go.Scatter(
-        x=[int(c) for c in cargas_val],
-        y=[amplitudes_carga[c] for c in cargas_val],
-        mode='markers',
-        name=f'Validação ({len(cargas_val)})',
-        marker=dict(color='#0D47A1', size=10, symbol='square'),
-        hovertemplate="Carga: %{x}<br>Amplitude ρ: %{y:.4e}<extra></extra>"
-    ))
+    # reconstrói ρ̃ 2D por carga
+    densidades_por_carga = {}
+    for carga_id in cargas_unicas:
+        grupo = base_eletrostatica[base_eletrostatica['carga_id'] == carga_id]
+        grupo = grupo.sort_values(['x_col', 'y_col'])
+        rho_flat = grupo['densidade_carga'].values.astype(np.float32)
+        densidades_por_carga[carga_id] = rho_flat.reshape(N_plus_1, N_plus_1, order='F')
 
-    fig.add_trace(go.Scatter(
-        x=[int(c) for c in cargas_test],
-        y=[amplitudes_carga[c] for c in cargas_test],
-        mode='markers',
-        name=f'Teste ({len(cargas_test)})',
-        marker=dict(color='#F57F17', size=10, symbol='diamond'),
-        hovertemplate="Carga: %{x}<br>Amplitude ρ: %{y:.4e}<extra></extra>"
-    ))
+    # parâmetros de cada carga: (centro_x, centro_y)
+    parametros_carga = (
+        base_eletrostatica
+        .groupby('carga_id')[['centro_x', 'centro_y']]
+        .first()
+    )
 
-    fig.update_layout(
-        title=dict(
-            text=f"<span style='font-size:20px; font-weight:bold;'>"
-                 f"Distribuição de Cargas por Conjunto</span><br><br>"
-                 f"<span style='font-size:16px; color:#555555;'>"
-                 f"Total: {n_cargas} distribuições de cargas | "
-                 f"Treino: {len(cargas_train)} | "
-                 f"Validação: {len(cargas_val)} | "
-                 f"Teste: {len(cargas_test)}</span>",
-            x=0.5, y=0.95, font=dict(size=20)
-        ),
-        xaxis_title="ID da carga",
-        yaxis_title="Amplitude Máxima de ρ",
-        width=1400,
-        height=700,
-        hovermode='closest',
-        plot_bgcolor='white',
-        margin=dict(t=140),
+    fig = cria_grafico_distribuicao_cargas(
+        cargas_train=cargas_train,
+        cargas_val=cargas_val,
+        cargas_test=cargas_test,
+        densidades_por_carga=densidades_por_carga,
+        parametros_carga=parametros_carga,
+        grid_x=grid_x,
+        grid_y=grid_y,
+        titulo="Distribuição de Densidade de Carga por Conjunto",
     )
 
     fig.write_html(f"{output_dir}/distribuicao_cargas_conjuntos.html")
@@ -328,7 +385,10 @@ def visualiza_distribuicao_dados_separado(
 
 
 def cria_modelo_mlp_node(input_dim: int, output_dim: int, parameters: Dict[str, Any]) -> nn.Module:
-    """Cria o modelo MLP para previsão do potencial elétrico φ(x,y) em toda a malha a partir de ρ(x,y)."""
+    """Cria o modelo MLP para previsão do potencial elétrico adimensional φ̃(x,y)
+    em toda a malha de integração numérica a partir de ρ̃(x,y).
+    Cada distribuição de carga é uma amostra.
+    """
 
     mlp_config = parameters.get('mlp', {})
     seed = parameters.get('seed', 42)
@@ -364,7 +424,7 @@ def treina_mlp_node(
     y_val: np.ndarray,
     parameters: Dict[str, Any]
 ) -> Tuple[nn.Module, Dict]:
-    """Treina o modelo MLP para prever φ(x,y) em toda a malha a partir de ρ(x,y)."""
+    """Treina o modelo MLP para prever φ̃(x,y) em toda a malha a partir de ρ̃(x,y)."""
 
     mlp_config = parameters.get('mlp', {})
     seed = parameters.get('seed', 42)
@@ -418,7 +478,7 @@ def treina_mlp_node(
     }
 
     print("\n=== INICIANDO TREINAMENTO DO MLP ===")
-    print(f"  Entrada: ρ(x,y) em toda a malha -> Saída: φ(x,y) em toda a malha")
+    print(f"  Entrada: ρ̃(x,y) em toda a malha -> Saída: φ̃(x,y) em toda a malha")
     print(f"  Batch size: {batch_size}")
     print(f"  Epochs: {epochs}")
     print(f"  Learning rate: {learning_rate}")
@@ -471,7 +531,7 @@ def treina_mlp_node(
 
     fig = cria_grafico_historico_treinamento(
         history=history,
-        titulo="Evolução da Função de Custo durante o Treinamento do MLP - Equação de Poisson 2D"
+        titulo="Evolução da Função de Custo Durante o Treinamento do MLP"
     )
 
     fig.write_html(grafico_historico_loss)
@@ -494,10 +554,8 @@ def avalia_metricas_mlp_node(
     scaler_y: StandardScaler,
 ) -> Dict[str, float]:
     """
-    Avalia o modelo MLP nos dados de validação e teste para a equação de Poisson 2D.
-
-    Avalia o potencial elétrico φ(x,y) previsto pelo modelo em toda a malha
-    contra o potencial de referência (solução espectral), amostra a amostra.
+    Avalia o potencial elétrico φ̃(x,y) previsto pelo modelo em
+    toda a malha contra o potencial de referência (solução espectral).
     """
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -556,12 +614,13 @@ def visualiza_previsoes_mlp_node(
 ) -> None:
     """
     Visualiza as previsões do modelo MLP nos dados de teste.
-    Compara o potencial elétrico previsto com o de referência em toda a malha.
+    Compara o potencial elétrico adimensional previsto com o de referência
+    em toda a malha.
 
     Args:
         model: Modelo treinado
-        X_test: Dados de teste (ρ(x,y) em toda a malha, achatado)
-        y_test: Targets de teste (potenciais φ(x,y) de referência, achatados)
+        X_test: Dados de teste (ρ̃(x,y) em toda a malha, achatado)
+        y_test: Targets de teste (potenciais φ̃(x,y) de referência, achatados)
         scaler_y: Scaler dos targets
         parameters: Parâmetros do pipeline
     """
@@ -594,7 +653,7 @@ def visualiza_previsoes_mlp_node(
     fig = cria_grafico_real_previsto_mlp(
         predictions=predictions_flat,
         y_true=y_true_flat,
-        titulo="Real vs Previsto - Equação de Poisson 2D (Dados de Teste)"
+        titulo="Dados Reais vs Previstos"
     )
 
     fig.write_html(grafico_previsoes_mlp)
@@ -612,9 +671,9 @@ def visualiza_previsoes_espaco_fases_node(
     parameters: Dict[str, Any]
 ) -> None:
     """
-    Node: Visualiza as previsões do modelo para o potencial elétrico φ(x,y)
-    como uma malha 2D completa por carga, anotando os parâmetros sorteados
-    da gaussiana em cada carga (amplitude, largura, centros).
+    Visualiza as previsões do modelo para o potencial elétrico
+    como uma malha 2D completa por carga, anotando os
+    parâmetros sorteados da gaussiana em cada carga (amplitude, largura, centros).
     """
     exp_name     = parameters.get('exp_name', 'default_exp')
     data_version = parameters.get('data_version', 'default_v1')
@@ -638,12 +697,16 @@ def visualiza_previsoes_espaco_fases_node(
     N = N_plus_1 - 1
 
     dom = parameters['solver']['dominio']
-    x_grid = np.linspace(dom['xmin'], dom['xmax'], N_plus_1)
-    y_grid = np.linspace(dom['ymin'], dom['ymax'], N_plus_1)
+
+    j = np.arange(N_plus_1)
+    xi_glc = np.cos(np.pi * j / N)
+
+    x_grid = 0.5 * (dom['xmin'] + dom['xmax']) + 0.5 * (dom['xmax'] - dom['xmin']) * xi_glc
+    y_grid = 0.5 * (dom['ymin'] + dom['ymax']) + 0.5 * (dom['ymax'] - dom['ymin']) * xi_glc
 
     print("\n=== VISUALIZAÇÃO DAS PREVISÕES ===")
     print(f"  Número de cargas de teste: {len(X_test)}")
-    print(f"  Pontos por carga: {n_pontos}  →  malha {N_plus_1} × {N_plus_1}")
+    print(f"  Pontos por carga: {n_pontos}  →  malha {N_plus_1} × {N_plus_1} (GLC)")
 
     X_test_tensor = torch.tensor(X_test, dtype=torch.float32).to(device)
 
@@ -670,7 +733,7 @@ def visualiza_previsoes_espaco_fases_node(
         parametros_cargas=params_test,
         x_grid=x_grid,
         y_grid=y_grid,
-        titulo="Previsões do Modelo — Equação de Poisson 2D"
+        titulo="Dados Reais vs Previsões do Modelo"
     )
 
     fig.write_html(grafico_previsoes_espaco_fases)

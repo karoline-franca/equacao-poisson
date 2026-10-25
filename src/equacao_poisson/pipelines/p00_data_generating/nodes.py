@@ -1,5 +1,5 @@
 """
-Nodes do pipeline Kedro para a equação de Poisson 2D em eletrostática.
+Nodes do pipeline Kedro para a equação de Poisson 2D adimensional.
 """
 
 import numpy as np
@@ -14,7 +14,7 @@ from .ep import PoissonEletrostatico
 
 def le_distribuicao_carga_node(parameters: Dict[str, Any]) -> pd.DataFrame:
     """
-    Gera n distribuições de carga.
+    Gera n distribuições de carga (adimensionais).
     """
     cfg      = parameters['densidade_carga']
     tipo     = cfg['tipo']
@@ -60,23 +60,21 @@ def le_distribuicao_carga_node(parameters: Dict[str, Any]) -> pd.DataFrame:
         raise ValueError(f"Tipo de densidade de carga não suportado para amostragem: {tipo}")
 
 
-def constroi_densidade_carga(row, eps0, dom) -> Callable:
+def constroi_densidade_carga(row, dom) -> Callable:
     """
-    Constrói a função ρ(x,y) a partir de uma linha do DataFrame de
-    distribuições de carga. O tipo é definido no parameters.yml.
+    Constrói a função ρ̃(x,y) adimensional a partir de uma linha do DataFrame
+    de distribuições de carga. O tipo é definido no parameters.yml.
 
     Para famílias que dependem do domínio (senoide, polinomial), as coordenadas
-    são normalizadas para [0,1] usando os extremos do domínio físico, de modo
-    que a densidade se anule corretamente nas arestas de [a,b]².
+    são normalizadas para [0,1] usando os extremos do domínio, de modo que a
+    densidade se anule corretamente nas arestas de [a,b]².
 
     Args:
         row  : linha do DataFrame com 'tipo' e os parâmetros da carga.
-        eps0 : permissividade do vácuo (usada quando a amplitude é dada
-               em múltiplos de ε₀ via 'amplitude_fator').
         dom  : dicionário com xmin, xmax, ymin, ymax.
 
     Returns:
-        callable ρ(Xg, Yg)
+        callable ρ̃(Xg, Yg)
     """
     tipo = row.tipo
 
@@ -108,7 +106,7 @@ def constroi_densidade_carga(row, eps0, dom) -> Callable:
         return rho
 
     elif tipo == 'senoide':
-        amp = row.amplitude_fator * eps0 if row.amplitude_fator is not None else row.amplitude
+        amp = row.amplitude_fator if row.amplitude_fator is not None else row.amplitude
         n, m = row.n, row.m
         def rho(Xg, Yg):
             sx = np.sin(n * np.pi * (Xg - xmin) / Lx)
@@ -134,24 +132,23 @@ def executa_simulacao_espectral_node(
     parameters: Dict[str, Any]
 ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     """
-    Executa a resolução espectral da equação de Poisson.
+    Executa a resolução espectral da equação de Poisson adimensional.
     """
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
     N     = int(parameters['solver']['N'])
     dom   = parameters['solver']['dominio']
-    eps0  = float(parameters['intervals']['parametro_eps0'])
 
-    params_solver = {'N': N, 'dominio': dom, 'eps0': eps0}
+    params_solver = {'N': N, 'dominio': dom}
 
     def contorno_aterrado(Xg, Yg):
         return np.zeros_like(Xg)
 
-    densidades = [constroi_densidade_carga(row, eps0, dom)
+    densidades = [constroi_densidade_carga(row, dom)
                   for row in distribuicoes_carga.itertuples()]
     contornos  = [contorno_aterrado] * len(densidades)
 
-    solver = PoissonEletrostatico(parametros_eps0=[eps0], device=device)
+    solver = PoissonEletrostatico(device=device)
     solucao = solver.resolve(
         densidade_carga=densidades,
         condicao_contorno=contornos,
@@ -162,9 +159,7 @@ def executa_simulacao_espectral_node(
         'dispositivo': device,
         'N': N,
         'n_cargas': int(len(distribuicoes_carga)),
-        'n_sistemas': int(solver.n_sistemas),
         'dominio': dom,
-        'parametros': {'eps0': eps0}
     }
 
     return solucao, metadados
@@ -176,7 +171,7 @@ def gera_base_consolidada_node(
 ) -> pd.DataFrame:
     """
     Constrói a base consolidada com potencial, densidade de carga e os
-    parâmetros sorteados da gaussiana de cada carga.
+    parâmetros sorteados da gaussiana de cada carga (tudo adimensional).
     """
     dados = []
     n_cargas = solucao['n_cargas']
@@ -210,7 +205,6 @@ def gera_base_consolidada_node(
 def cria_visualizacoes_node(solucao):
     data_version = os.environ.get('DATA_VERSION', 'base_01')
     output_dir = f"data/05_model_input/{data_version}"
-    os.makedirs(output_dir, exist_ok=True)
 
     MAX_CARGAS_VIS = 10
     solucao_reduzida = dict(solucao)

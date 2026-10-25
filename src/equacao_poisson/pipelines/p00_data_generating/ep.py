@@ -1,9 +1,9 @@
 """
-Classe para resolver a equação de Poisson 2D em eletrostática usando o método
+Classe para resolver a equação de Poisson 2D (adimensional) usando o método
 pseudo-espectral de Galerkin-Colocação com polinômios de Chebyshev.
-A equação de Poisson em eletrostática descreve o potencial elétrico gerado por
-uma distribuição de carga ρ.
-Sistema: ∇²φ = -ρ/ε₀,  φ = g em ∂Ω
+A equação de Poisson adimensionalizada descreve o potencial elétrico gerado
+por uma distribuição de carga ρ, ambos em unidades puramente numéricas.
+Sistema: ∇²φ̃ = -ρ̃,  φ̃ = g̃ em ∂Ω
 """
 
 import numpy as np
@@ -12,32 +12,31 @@ from .me import PoissonSpectral2D
 
 class PoissonEletrostatico:
     """
-    Classe para resolver a equação de Poisson 2D em eletrostática usando o
+    Classe para resolver a equação de Poisson 2D adimensional usando o
     método pseudo-espectral de Galerkin-Colocação.
+
+    A adimensionalização absorve a permissividade ε₀ na escala do potencial
+    (φ = φ̃ · φ₀, com φ₀ = ρ₀·L₀²/ε₀), de modo que a equação se reduz a
+    ∇²φ̃ = -ρ̃ e todos os resultados numéricos são adimensionais.
     """
 
-    def __init__(self, parametros_eps0, device='cpu'):
+    def __init__(self, device='cpu'):
         """
         Args:
-            parametros_eps0 (float, list ou array): permissividade(s) do vácuo (ε₀)
             device (str): dispositivo para computação ('cpu' ou 'cuda')
         """
-        if np.isscalar(parametros_eps0):
-            parametros_eps0 = [parametros_eps0]
-        self.parametros_eps0 = np.asarray(parametros_eps0, dtype=np.float64)
-        self.n_sistemas = len(self.parametros_eps0)
-
         self.device = device
         self.solver = PoissonSpectral2D(device=device)
 
     def resolve(self, densidade_carga, condicao_contorno, params):
         """
-        Resolve a equação de Poisson para uma ou várias distribuições de carga.
+        Resolve a equação de Poisson adimensional para uma ou várias
+        distribuições de carga.
 
         Args:
-            densidade_carga: função ρ(x,y) OU lista de funções
-            condicao_contorno: função g(x,y) OU lista de funções (uma por carga)
-            params: dicionário com 'N', 'dominio', 'eps0'
+            densidade_carga: função ρ̃(x,y) OU lista de funções
+            condicao_contorno: função g̃(x,y) OU lista de funções (uma por carga)
+            params: dicionário com 'N', 'dominio'
 
         Returns:
             dict com 'potencial', 'cargas', 'residuos' e metadados
@@ -67,7 +66,5 @@ class PoissonEletrostatico:
             'N': solucoes[0]['N'],
             'dominio': solucoes[0]['dominio'],
             'residuos': residuos,
-            'parametros_eps0': self.parametros_eps0,
             'n_cargas': n_cargas,
-            'n_sistemas': self.n_sistemas
         }

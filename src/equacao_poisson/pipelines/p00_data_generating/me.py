@@ -1,5 +1,5 @@
 """
-Classe para resolver a equação de Poisson 2D em eletrostática usando o método
+Classe para resolver a equação de Poisson 2D adimensional usando o método
 pseudo-espectral Galerkin-Colocação com polinômios de Chebyshev.
 """
 
@@ -9,11 +9,15 @@ import numpy as np
 class PoissonSpectral2D:
     """
     Implementação do método pseudo-espectral Galerkin-Colocação para resolver
-    a equação de Poisson 2D em eletrostática:
+    a equação de Poisson 2D adimensional:
 
-        ∇²φ(x,y) = -ρ(x,y)/ε₀,   (x,y) ∈ Ω,
+        ∇²φ̃(x,y) = -ρ̃(x,y),   (x,y) ∈ Ω,
 
     com condições de contorno de Dirichlet gerais prescritas em ∂Ω.
+
+    A permissividade ε₀ foi absorvida na escala do potencial
+    (φ = φ̃ · φ₀, com φ₀ = ρ₀·L₀²/ε₀), de modo que todos os resultados
+    numéricos são adimensionais.
     """
 
     def __init__(self, device='cpu'):
@@ -31,7 +35,7 @@ class PoissonSpectral2D:
 
         Args:
             N (int): grau do polinômio (N+1 pontos de colocação)
-            a, b (float): extremos do domínio físico
+            a, b (float): extremos do domínio (em unidades adimensionais)
 
         Returns:
             tuple: (xi, D2) pontos GLC em [-1,1] e matriz D2 no domínio físico
@@ -57,27 +61,27 @@ class PoissonSpectral2D:
 
     def solve(self, densidade_carga, condicao_contorno, params):
         """
-        Resolve a equação de Poisson 2D em eletrostática para uma dada distribuição
+        Resolve a equação de Poisson 2D adimensional para uma dada distribuição
         de carga e condições de contorno de Dirichlet gerais.
 
         Args:
-            densidade_carga (callable): Função que define a densidade de carga ρ(x,y).
-                            Deve ter assinatura: densidade_carga(Xg, Yg) -> ρ
-            condicao_contorno (callable): Função que define o potencial prescrito em ∂Ω.
-                            Deve ter assinatura: condicao_contorno(Xg, Yg) -> g
-                            onde g é o valor de Dirichlet em cada ponto da malha.
+            densidade_carga (callable): Função que define a densidade de carga
+                            adimensional ρ̃(x,y). Deve ter assinatura:
+                            densidade_carga(Xg, Yg) -> ρ̃
+            condicao_contorno (callable): Função que define o potencial
+                            adimensional prescrito em ∂Ω. Deve ter assinatura:
+                            condicao_contorno(Xg, Yg) -> g̃
             params (dict): Dicionário de parâmetros lido do parameters.yml, contendo:
                             - 'N'        : grau do polinômio (N+1 pontos por direção)
                             - 'dominio'  : dict com xmin, xmax, ymin, ymax
-                            - 'eps0'     : permissividade do vácuo
+                            (não há mais 'eps0': a equação é adimensional)
 
         Returns:
-            dict: Dicionário com a malha de colocação, o potencial elétrico calculado
-                  e o resíduo da equação de Poisson nos pontos interiores.
+            dict: Dicionário com a malha de colocação, o potencial adimensional
+                  calculado e o resíduo da equação nos pontos interiores.
         """
         N    = int(params['N'])
         dom  = params['dominio']
-        eps0 = params['eps0']
 
         xmin, xmax = dom['xmin'], dom['xmax']
         ymin, ymax = dom['ymin'], dom['ymax']
@@ -90,12 +94,12 @@ class PoissonSpectral2D:
 
         Xg, Yg = np.meshgrid(x, y, indexing="ij")
 
-        # termo fonte: f = -ρ/ε₀
+        # termo fonte adimensional: f̃ = -ρ̃
         rho    = densidade_carga(Xg, Yg)
-        f      = -rho / eps0
+        f      = -rho
         f_flat = f.ravel(order="F")
 
-        # CC de Dirichlet: φ = g(x,y) em ∂Ω
+        # CC de Dirichlet: φ̃ = g̃(x,y) em ∂Ω
         g       = condicao_contorno(Xg, Yg)
         g_flat  = g.ravel(order="F")
 
@@ -117,7 +121,7 @@ class PoissonSpectral2D:
         phi_flat = np.linalg.solve(A, rhs)
         phi      = phi_flat.reshape((N + 1, N + 1), order="F")
 
-        # resíduo da equação de Poisson nos pontos interiores
+        # resíduo da equação nos pontos interiores (adimensional)
         residuo = np.linalg.norm((Lap @ phi_flat - f_flat)[~mask_bc.ravel(order="F")],
                                  ord=np.inf)
 

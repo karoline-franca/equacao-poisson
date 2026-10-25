@@ -2,22 +2,27 @@ simulation:
   n_cargas: 2000
 
 intervals:
-  parametro_eps0: 8.8541878128e-12
+  # o fator ε₀ não é mais necessário: a equação foi adimensionalizada
+  # (∇²φ̃ = -ρ̃) e a escala física está absorvida em φ̃ = φ/φ₀.
+  # parametro_eps0: 8.8541878128e-12
 
 densidade_carga:
   # tipo: senoide
   # parametros:
-  #   amplitude_fator: 7.402203300817018     # A = fator × ε₀  (fator = 3π²/4)
+  #   amplitude_fator: 7.402203300817018     # adimensional (era fator × ε₀)
   #   n: 1
   #   m: 1
   #   l: 1
 
   tipo: gaussiana
   parametros:
+    # amplitude adimensional (valores puros, sem unidade física)
     amplitude_min:  10.0e-2
     amplitude_max: 100.0e-2
+    # largura em unidades de comprimento adimensional (L/L₀, com L₀ = 1)
     largura_min:     0.08
     largura_max:     0.25
+    # centros adimensionais (x/L₀, y/L₀), com L₀ = 1
     centro_x_min:   -0.5
     centro_x_max:    0.5
     centro_y_min:   -0.5
@@ -25,12 +30,12 @@ densidade_carga:
 
   # tipo: gaussiana_dupla
   # parametros:
-  #   A1: 1.0e-10
-  #   A2: -0.8e-10
+  #   A1: 1.0
+  #   A2: -0.8
   #   sigma1: 0.15
   #   sigma2: 0.10
-  #   c1: [0.3, -0.2, 0.4]
-  #   c2: [-0.4, 0.3, -0.2]
+  #   c1: [0.3, -0.2]
+  #   c2: [-0.4, 0.3]
 
 solver:
   N: 20
@@ -46,6 +51,6 @@ mlp:
   hidden_dims: [64, 128]            # camadas ocultas
   activation: "relu"                # função de ativação
   batch_size: 32                    # tamanho do batch
-  epochs: 150                       # número de épocas
+  epochs: 80                        # número de épocas
   learning_rate: 0.001              # taxa de aprendizado
   weight_decay: 0.001               # regularização L2

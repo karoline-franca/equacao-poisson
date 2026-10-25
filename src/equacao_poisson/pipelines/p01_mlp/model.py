@@ -1,13 +1,15 @@
 """
-Definição da arquitetura do MLP para previsão do potencial elétrico φ(x,y)
-a partir da densidade de carga ρ(x,y) na equação de Poisson 2D em eletrostática.
+Definição da arquitetura do MLP para previsão do potencial elétrico adimensional
+φ̃(x,y) a partir da densidade de carga adimensional ρ̃(x,y) na equação de
+Poisson 2D adimensional.
 
-O modelo recebe como entrada os valores de ρ(x,y) em todos os pontos da malha
-de colocação (achatados em um vetor) e devolve os valores de φ(x,y) nos mesmos
-pontos (achatados no mesmo formato).
+O modelo recebe como entrada os valores de ρ̃(x,y) em todos os pontos da malha
+de colocação (achatados em um vetor) e devolve os valores de φ̃(x,y) nos
+mesmos pontos (achatados no mesmo formato).
 
 As coordenadas (x, y) são apenas referência para montar a malha; não entram
-como features de entrada nem como alvos de saída.
+como features de entrada nem como alvos de saída. Todos os valores são
+adimensionais (grandezas puras).
 """
 
 import numpy as np
@@ -17,13 +19,14 @@ import torch.nn as nn
 
 class MLP(nn.Module):
     """
-    Multi-Layer Perceptron para prever o potencial elétrico φ(x,y) em todos os
-    pontos da malha a partir da densidade de carga ρ(x,y) avaliada na mesma
-    malha.
+    Multi-Layer Perceptron para prever o potencial elétrico adimensional φ̃(x,y)
+    em todos os pontos da malha a partir da densidade de carga adimensional
+    ρ̃(x,y) avaliada na mesma malha.
 
-    Entrada: ρ(x,y) nos N+1 pontos de colocação em cada direção, achatados
-             em um vetor de dimensão (N+1)².
-    Saída:   φ(x,y) nos mesmos pontos, achatados em um vetor de dimensão (N+1)².
+    Entrada: ρ̃(x,y) nos N+1 pontos de colocação em cada direção, achatados
+             em um vetor de dimensão (N+1)² (adimensional).
+    Saída:   φ̃(x,y) nos mesmos pontos, achatados em um vetor de dimensão (N+1)²
+             (adimensional).
     """
 
     def __init__(self, input_dim, hidden_dims=[128, 256, 512], output_dim=None,
@@ -79,26 +82,26 @@ class MLP(nn.Module):
         Forward pass.
 
         Args:
-            x: tensor de entrada (batch_size, (N+1)²) — valores de ρ(x,y) nos
-               pontos de colocação, achatados.
+            x: tensor de entrada (batch_size, (N+1)²) — valores adimensionais
+               de ρ̃(x,y) nos pontos de colocação, achatados.
 
         Returns:
-            tensor de saída (batch_size, (N+1)²) — valores de φ(x,y) nos
-            mesmos pontos, achatados.
+            tensor de saída (batch_size, (N+1)²) — valores adimensionais de
+            φ̃(x,y) nos mesmos pontos, achatados.
         """
         return self.network(x)
 
     def predict_potential(self, rho):
         """
-        Prevê o potencial elétrico φ(x,y) em toda a malha para uma única
-        distribuição de carga ρ(x,y).
+        Prevê o potencial elétrico adimensional φ̃(x,y) em toda a malha para
+        uma única distribuição de carga adimensional ρ̃(x,y).
 
         Args:
-            rho: array de densidade de carga nos pontos de colocação, com
-                 shape (N+1, N+1) ou já achatado em (input_dim,).
+            rho: array de densidade de carga adimensional nos pontos de
+                 colocação, com shape (N+1, N+1) ou já achatado em (input_dim,).
 
         Returns:
-            array de potencial elétrico com o mesmo shape de rho.
+            array de potencial elétrico adimensional com o mesmo shape de rho.
         """
         self.eval()
         shape_original = np.asarray(rho).shape
@@ -110,15 +113,16 @@ class MLP(nn.Module):
 
     def predict_potential_batch(self, rho_batch):
         """
-        Prevê o potencial elétrico φ(x,y) em toda a malha para múltiplas
-        distribuições de carga ρ(x,y).
+        Prevê o potencial elétrico adimensional φ̃(x,y) em toda a malha para
+        múltiplas distribuições de carga adimensional ρ̃(x,y).
 
         Args:
-            rho_batch: array de densidade de carga com shape
+            rho_batch: array de densidade de carga adimensional com shape
                        (batch_size, N+1, N+1) ou (batch_size, input_dim).
 
         Returns:
-            array de potencial elétrico com o mesmo shape de rho_batch.
+            array de potencial elétrico adimensional com o mesmo shape de
+            rho_batch.
         """
         self.eval()
         shape_original = np.asarray(rho_batch).shape
