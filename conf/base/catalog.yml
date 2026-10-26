@@ -3,45 +3,33 @@
 # ============================================================
 
 distribuicoes_carga:
-  type: pandas.CSVDataset
-  filepath: data/02_intermediate/${runtime_params:data_version,default_v1}/distribuicoes_carga.csv
-  load_args:
-    sep: ';'
-    encoding: 'latin-1'
-  save_args:
-    index: False
-    sep: ';'
-    encoding: 'latin-1'
+  type: pandas.ParquetDataset
+  filepath: data/02_intermediate/${runtime_params:data_version,default_v1}/distribuicoes_carga.parquet
 
 parametros_eletrostatico:
-  type: pandas.CSVDataset
-  filepath: data/02_intermediate/${runtime_params:data_version,default_v1}/parametros_eletrostatico.csv
-  load_args:
-    sep: ';'
-    encoding: 'latin-1'
-  save_args:
-    index: False
-    sep: ';'
-    encoding: 'latin-1'
+  type: pandas.ParquetDataset
+  filepath: data/02_intermediate/${runtime_params:data_version,default_v1}/parametros_eletrostatico.parquet
 
 solucao_espectral:
   type: pickle.PickleDataset
   filepath: data/03_primary/${runtime_params:data_version,default_v1}/solucao_espectral.pkl
 
 base_eletrostatica:
-  type: pandas.CSVDataset
-  filepath: data/04_feature/${runtime_params:data_version,default_v1}/base_poisson.csv
+  type: pandas.ParquetDataset
+  filepath: data/04_feature/${runtime_params:data_version,default_v1}/base_poisson.parquet
   load_args:
-    sep: ';'
-    encoding: 'latin-1'
-    dtype:
-      densidade_carga: float64
-      potencial: float64
-  save_args:
-    index: False
-    sep: ';'
-    encoding: 'latin-1'
-    float_format: '%.15e'
+    columns:
+      - carga_id
+      - x_col
+      - y_col
+      - x
+      - y
+      - densidade_carga
+      - potencial
+      - amplitude
+      - largura
+      - centro_x
+      - centro_y
 
 metadata_simulacao:
   type: json.JSONDataset
@@ -129,34 +117,13 @@ params_test:
   type: MemoryDataset
 
 # base_interpolada_pontual:
-#   type: pandas.CSVDataset
-#   filepath: data/08_reporting/${runtime_params:exp_name,default_exp}/${runtime_params:data_version,default_v1}/base_interpolada_pontual.csv
-#   load_args:
-#     sep: ';'
-#     encoding: 'latin-1'
-#   save_args:
-#     index: False
-#     sep: ';'
-#     encoding: 'latin-1'
+#   type: pandas.ParquetDataset
+#   filepath: data/08_reporting/${runtime_params:exp_name,default_exp}/${runtime_params:data_version,default_v1}/base_interpolada_pontual.parquet
 
 # base_interpolada_entre_trajetorias:
-#   type: pandas.CSVDataset
-#   filepath: data/08_reporting/${runtime_params:exp_name,default_exp}/${runtime_params:data_version,default_v1}/base_interpolada_entre_trajetorias.csv
-#   load_args:
-#     sep: ';'
-#     encoding: 'latin-1'
-#   save_args:
-#     index: False
-#     sep: ';'
-#     encoding: 'latin-1'
+#   type: pandas.ParquetDataset
+#   filepath: data/08_reporting/${runtime_params:exp_name,default_exp}/${runtime_params:data_version,default_v1}/base_interpolada_entre_trajetorias.parquet
 
 # base_interpolada_trajetorias:
-#   type: pandas.CSVDataset
-#   filepath: data/08_reporting/${runtime_params:exp_name,default_exp}/${runtime_params:data_version,default_v1}/base_interpolada_trajetorias.csv
-#   load_args:
-#     sep: ';'
-#     encoding: 'latin-1'
-#   save_args:
-#     index: False
-#     sep: ';'
-#     encoding: 'latin-1'
+#   type: pandas.ParquetDataset
+#   filepath: data/08_reporting/${runtime_params:exp_name,default_exp}/${runtime_params:data_version,default_v1}/base_interpolada_trajetorias.parquet

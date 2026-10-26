@@ -7,6 +7,7 @@ from kedro.pipeline import Pipeline, node
 from .nodes import (
     prepara_dados_mlp_node,
     visualiza_distribuicao_max_rho_node,
+    visualiza_distribuicao_max_phi_node,
     visualiza_distribuicao_dados_separado,
     cria_modelo_mlp_node,
     treina_mlp_node,
@@ -24,12 +25,13 @@ def create_pipeline(**kwargs) -> Pipeline:
     Pipeline:
         1. Prepara dados (treino, validação, teste) a partir da base consolidada
         2. Visualiza distribuição de amplitudes máximas de densidade de carga
-        3. Visualiza distribuição dos dados
-        4. Cria modelo MLP
-        5. Treina modelo
-        6. Avalia métricas
-        7. Visualiza previsões por densidade de carga
-        8. Visualiza previsões do modelos vs. valores reais
+        3. Visualiza distribuição de amplitudes máximas do potencial elétrico
+        4. Visualiza distribuição dos dados
+        5. Cria modelo MLP
+        6. Treina modelo
+        7. Avalia métricas
+        8. Visualiza previsões por densidade de carga
+        9. Visualiza previsões do modelos vs. valores reais
     """
 
     return Pipeline([
@@ -46,13 +48,21 @@ def create_pipeline(**kwargs) -> Pipeline:
             tags=["data_preparation", "mlp"]
         ),
 
-    node(
-        func=visualiza_distribuicao_max_rho_node,
-        inputs=["base_eletrostatica", "parameters"],
-        outputs=None,
-        name="node_visualiza_distribuicao_max_rho",
-        tags=["visualization", "eda"]
-    ),
+        node(
+            func=visualiza_distribuicao_max_rho_node,
+            inputs=["base_eletrostatica", "parameters"],
+            outputs=None,
+            name="node_visualiza_distribuicao_max_rho",
+            tags=["visualization", "eda"]
+        ),
+
+        node(
+            func=visualiza_distribuicao_max_phi_node,
+            inputs=["base_eletrostatica", "parameters"],
+            outputs=None,
+            name="node_visualiza_distribuicao_max_phi",
+            tags=["visualization", "eda"]
+        ),
 
         node(
             func=visualiza_distribuicao_dados_separado,

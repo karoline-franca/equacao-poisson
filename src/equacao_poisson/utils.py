@@ -427,6 +427,180 @@ def cria_grafico_distribuicao_max_rho(
     return fig
 
 
+def cria_grafico_distribuicao_max_phi(
+    cargas_train, cargas_val, cargas_test,
+    parametros_carga,
+    amplitudes_potencial,
+    titulo="Distribuição das Amplitudes Máximas de Potencial Elétrico por Conjunto"
+):
+    """
+    Cria gráfico 2D com a distribuição espacial (centro_x, centro_y) das
+    cargas de cada conjunto (treino/validação/teste), com o marcador de cada
+    carga colorido pelo valor máximo de φ̃.
+
+    Uma cor fixa por conjunto (verde, azul, laranja) distingue treino,
+    validação e teste. A intensidade da cor (na escala Viridis) reflete
+    a amplitude máxima de φ̃ (x,y) da carga.
+    """
+
+    n_train = len(cargas_train)
+    n_val   = len(cargas_val)
+    n_test  = len(cargas_test)
+    total   = n_train + n_val + n_test
+
+    # escala de cores global (todas as cargas compartilham o mesmo range)
+    todas_amplitudes = list(amplitudes_potencial.values())
+    amin = float(min(todas_amplitudes))
+    amax = float(max(todas_amplitudes))
+
+    def _coords_centro(carga_id):
+        if hasattr(parametros_carga, 'loc'):
+            if carga_id in parametros_carga.index:
+                row = parametros_carga.loc[carga_id]
+            elif 'carga_id' in parametros_carga.columns:
+                row = parametros_carga[parametros_carga['carga_id'] == carga_id].iloc[0]
+            else:
+                row = parametros_carga.iloc[int(carga_id)]
+            return float(row['centro_x']), float(row['centro_y'])
+        else:
+            return (float(parametros_carga['centro_x'][carga_id]),
+                    float(parametros_carga['centro_y'][carga_id]))
+
+    def _coords_lista(cargas):
+        xs, ys, amps = [], [], []
+        for c in cargas:
+            xc, yc = _coords_centro(c)
+            xs.append(xc)
+            ys.append(yc)
+            amps.append(amplitudes_potencial[c])
+        return xs, ys, amps
+
+    fig = go.Figure()
+
+    fig.add_trace(go.Scatter(
+        x=[None], y=[None],
+        mode='markers',
+        marker=dict(
+            colorscale="Viridis",
+            cmin=amin, cmax=amax,
+            showscale=True,
+            colorbar=dict(title="φ̃ (x,y) máximo", x=1.02, len=0.55),
+        ),
+        showlegend=False,
+        hoverinfo='skip',
+        name='colorbar_phi_max',
+    ))
+
+    # treino (círculos, borda verde)
+    x_train, y_train, a_train = _coords_lista(cargas_train)
+    fig.add_trace(go.Scatter(
+        x=x_train, y=y_train,
+        mode='markers',
+        name=f'Treino ({n_train})',
+        marker=dict(
+            color=a_train,
+            colorscale="Viridis",
+            cmin=amin, cmax=amax,
+            size=11, symbol='circle',
+            line=dict(width=2, color='#2E7D32'),
+            showscale=False,
+        ),
+        hovertemplate=(
+            "<b>Treino</b><br>"
+            "centro_x = %{x:.3f}<br>"
+            "centro_y = %{y:.3f}<br>"
+            "φ̃ (x,y) máxima = %{marker.color:.3e}<br>"
+            "<extra></extra>"
+        )
+    ))
+
+    # validação (quadrados, borda azul)
+    x_val, y_val, a_val = _coords_lista(cargas_val)
+    fig.add_trace(go.Scatter(
+        x=x_val, y=y_val,
+        mode='markers',
+        name=f'Validação ({n_val})',
+        marker=dict(
+            color=a_val,
+            colorscale="Viridis",
+            cmin=amin, cmax=amax,
+            size=11, symbol='square',
+            line=dict(width=2, color='#0D47A1'),
+            showscale=False,
+        ),
+        hovertemplate=(
+            "<b>Validação</b><br>"
+            "centro_x = %{x:.3f}<br>"
+            "centro_y = %{y:.3f}<br>"
+            "φ̃ (x,y) máxima = %{marker.color:.3e}<br>"
+            "<extra></extra>"
+        )
+    ))
+
+    # teste (losangos, borda laranja)
+    x_test, y_test, a_test = _coords_lista(cargas_test)
+    fig.add_trace(go.Scatter(
+        x=x_test, y=y_test,
+        mode='markers',
+        name=f'Teste ({n_test})',
+        marker=dict(
+            color=a_test,
+            colorscale="Viridis",
+            cmin=amin, cmax=amax,
+            size=11, symbol='diamond',
+            line=dict(width=2, color='#F57F17'),
+            showscale=False,
+        ),
+        hovertemplate=(
+            "<b>Teste</b><br>"
+            "centro_x = %{x:.3f}<br>"
+            "centro_y = %{y:.3f}<br>"
+            "φ̃ (x,y) = %{marker.color:.3e}<br>"
+            "<extra></extra>"
+        )
+    ))
+
+    fig.update_layout(
+        title=dict(
+            text=f"<span style='font-size:20px; font-weight:bold;'>{titulo}</span><br><br>"
+                 f"<span style='font-size:16px; color:#555555;'>"
+                 f"Total: {total} Distribuições de Potencial Elétrico | "
+                 f"Treino: {n_train} ({n_train/total*100:.1f}%) | "
+                 f"Validação: {n_val} ({n_val/total*100:.1f}%) | "
+                 f"Teste: {n_test} ({n_test/total*100:.1f}%)</span>",
+            x=0.5, y=0.95, font=dict(size=20)
+        ),
+        xaxis_title="x (Centro da Gaussiana)",
+        yaxis_title="y (Centro da Gaussiana)",
+        width=1200, height=900,
+        legend=dict(
+            title="Legenda",
+            x=1.02, y=1.00,
+            xanchor="left", yanchor="top",
+            bgcolor='rgba(255, 255, 255, 0.9)',
+            bordercolor='black',
+            borderwidth=1,
+            font=dict(size=12),
+            itemclick="toggle",
+            itemdoubleclick="toggleothers"
+        ),
+        hovermode='closest',
+        plot_bgcolor='white',
+        margin=dict(t=140, r=200),
+        xaxis=dict(
+            showgrid=False, zeroline=False,
+            title_font=dict(size=16), tickfont=dict(size=14),
+            scaleanchor="y", scaleratio=1,
+        ),
+        yaxis=dict(
+            showgrid=False, zeroline=False,
+            title_font=dict(size=16), tickfont=dict(size=14),
+        ),
+    )
+
+    return fig
+
+
 def cria_grafico_distribuicao_cargas(
     cargas_train, cargas_val, cargas_test,
     densidades_por_carga,

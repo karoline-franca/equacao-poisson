@@ -26,6 +26,7 @@ from .model import MLP
 from equacao_poisson.utils import (
     CORES_PALETA,
     cria_grafico_distribuicao_max_rho,
+    cria_grafico_distribuicao_max_phi,
     cria_grafico_distribuicao_cargas,
     cria_grafico_historico_treinamento,
     cria_grafico_previsoes_espaco_fases,
@@ -125,11 +126,8 @@ def prepara_dados_mlp_node(base_eletrostatica: pd.DataFrame, parameters: Dict[st
     y_raw = np.array(y_list, dtype=np.float32)   # (n_cargas, (N+1)²)
     params_df = pd.DataFrame(params_list)        # (n_cargas, n_parametros)
 
-    print(f"\n  Distribuições válidas: {len(X_raw)}")
-    print(f"  Dimensão entrada: {X_raw.shape[1]} (pontos de colocação)")
-    print(f"  Dimensão saída: {y_raw.shape[1]} (pontos de colocação)")
-    if colunas_param:
-        print(f"  Parâmetros propagados por carga: {colunas_param}")
+    print(f"  Pontos de colocação de entrada: {X_raw.shape[1]}")
+    print(f"  Pontos de colocação de saída: {y_raw.shape[1]}")
 
     # divisão por carga (70/20/10)
     n_cargas = len(X_raw)
@@ -157,9 +155,9 @@ def prepara_dados_mlp_node(base_eletrostatica: pd.DataFrame, parameters: Dict[st
     params_val   = params_df.iloc[val_indices].reset_index(drop=True)
     params_test  = params_df.iloc[test_indices].reset_index(drop=True)
 
-    print(f"\n  Cargas de treino: {len(X_train)}")
-    print(f"  Cargas de validação: {len(X_val)}")
-    print(f"  Cargas de teste: {len(X_test)}")
+    print(f"\n  Distribuições de carga de treino: {len(X_train)}")
+    print(f"  Distribuições de carga de validação: {len(X_val)}")
+    print(f"  Distribuições de carga de teste: {len(X_test)}")
 
     # -------------------------------------------------------------
     # normalização com tratamento de colunas de variância zero
@@ -191,8 +189,8 @@ def prepara_dados_mlp_node(base_eletrostatica: pd.DataFrame, parameters: Dict[st
     input_dim  = X_raw.shape[1]
     output_dim = y_raw.shape[1]
 
-    print(f"\n  Dimensão entrada: {input_dim}")
-    print(f"  Dimensão saída: {output_dim}")
+    print(f"\n  Dimensão de entrada: {input_dim}")
+    print(f"  Dimensão de saída: {output_dim}")
 
     return (X_scaled_train, y_scaled_train,
             X_scaled_val, y_scaled_val,
@@ -244,8 +242,8 @@ def visualiza_distribuicao_max_rho_node(
     cargas_val   = cargas_unicas[val_indices]
     cargas_test  = cargas_unicas[test_indices]
 
-    print(f"\n=== DISTRIBUIÇÃO DOS MÁXIMOS DE DENSIDADE DE CARGA ===")
-    print(f"  Total de Cargas: {n_cargas}")
+    print(f"\n=== DISTRIBUIÇÃO DE AMPLITUDES MÁXIMAS DE DENSIDADE DE CARGA ===")
+    print(f"  Total de Densidades de Cargas: {n_cargas}")
     print(f"  Treino: {len(cargas_train)} | "
           f"Validação: {len(cargas_val)} | "
           f"Teste: {len(cargas_test)}")
@@ -267,6 +265,69 @@ def visualiza_distribuicao_max_rho_node(
     )
 
     fig.write_html(f"{output_dir}/distribuicao_max_rho.png.html")
+    fig.show()
+
+    return None
+
+
+def visualiza_distribuicao_max_phi_node(
+    base_eletrostatica: pd.DataFrame,
+    parameters: Dict[str, Any]
+) -> None:
+    """
+    Node: gera o gráfico da distribuição espacial (centro_x, centro_y) dos
+    valores máximos de φ̃ para cada conjunto (treino/validação/teste).
+    """
+    data_version = parameters.get('data_version', 'default_v1')
+    output_dir = f"data/08_reporting/{data_version}"
+    os.makedirs(output_dir, exist_ok=True)
+
+    for col in base_eletrostatica.columns:
+        if base_eletrostatica[col].dtype == 'object':
+            try:
+                base_eletrostatica[col] = base_eletrostatica[col].astype(str).str.replace(',', '.').astype(float)
+            except Exception:
+                pass
+
+    cargas_unicas = base_eletrostatica['carga_id'].unique()
+    n_cargas = len(cargas_unicas)
+
+    # amplitude máxima de φ̃ por carga
+    amplitudes_potencial = {}
+    for carga_id in cargas_unicas:
+        grupo = base_eletrostatica[base_eletrostatica['carga_id'] == carga_id]
+        amplitudes_potencial[carga_id] = np.max(np.abs(grupo['potencial'].values))
+
+    # divisão por carga (70/20/10)
+    indices = np.random.RandomState(42).permutation(n_cargas)
+    n_train = int(0.7 * n_cargas)
+    n_val   = int(0.2 * n_cargas)
+
+    train_indices = indices[:n_train]
+    val_indices   = indices[n_train:n_train + n_val]
+    test_indices  = indices[n_train + n_val:]
+
+    cargas_train = cargas_unicas[train_indices]
+    cargas_val   = cargas_unicas[val_indices]
+    cargas_test  = cargas_unicas[test_indices]
+
+    # parâmetros de cada carga: (centro_x, centro_y)
+    parametros_carga = (
+        base_eletrostatica
+        .groupby('carga_id')[['centro_x', 'centro_y']]
+        .first()
+    )
+
+    fig = cria_grafico_distribuicao_max_phi(
+        cargas_train=cargas_train,
+        cargas_val=cargas_val,
+        cargas_test=cargas_test,
+        parametros_carga=parametros_carga,
+        amplitudes_potencial=amplitudes_potencial,
+        titulo="Distribuição das Amplitudes Máximas de Potencial Elétrico por Conjunto",
+    )
+
+    fig.write_html(f"{output_dir}/distribuicao_max_phi.html")
     fig.show()
 
     return None
@@ -311,15 +372,15 @@ def visualiza_distribuicao_dados_separado(
     cargas_ordenadas_pot = sorted(amplitudes_potencial.items(), key=lambda x: x[1])
     amplitudes_pot_ordenadas = [t[1] for t in cargas_ordenadas_pot]
 
-    print(f"\n=== DISTRIBUIÇÃO DAS CARGAS POR AMPLITUDE ===")
-    print(f"  Amplitude de ρ̃ mínima: {amplitudes_carga_ordenadas[0]:.4e}")
-    print(f"  Amplitude de ρ̃ máxima: {amplitudes_carga_ordenadas[-1]:.4e}")
-    print(f"  Amplitude de ρ̃ mediana: {amplitudes_carga_ordenadas[len(amplitudes_carga_ordenadas)//2]:.4e}")
+    print(f"\n=== DISTRIBUIÇÃO DAS DENSIDADES DE CARGA POR AMPLITUDE ===")
+    print(f"  Amplitude mínima de ρ̃ : {amplitudes_carga_ordenadas[0]:.4e}")
+    print(f"  Amplitude máxima de ρ̃ : {amplitudes_carga_ordenadas[-1]:.4e}")
+    print(f"  Amplitude mediana de ρ̃ : {amplitudes_carga_ordenadas[len(amplitudes_carga_ordenadas)//2]:.4e}")
 
     print(f"\n=== DISTRIBUIÇÃO DOS POTENCIAIS POR AMPLITUDE ===")
-    print(f"  Amplitude de φ̃ mínima: {amplitudes_pot_ordenadas[0]:.4e}")
-    print(f"  Amplitude de φ̃ máxima: {amplitudes_pot_ordenadas[-1]:.4e}")
-    print(f"  Amplitude de φ̃ mediana: {amplitudes_pot_ordenadas[len(amplitudes_pot_ordenadas)//2]:.4e}")
+    print(f"  Amplitude mínima de φ̃ : {amplitudes_pot_ordenadas[0]:.4e}")
+    print(f"  Amplitude máxima de φ̃ : {amplitudes_pot_ordenadas[-1]:.4e}")
+    print(f"  Amplitude mediana de φ̃ : {amplitudes_pot_ordenadas[len(amplitudes_pot_ordenadas)//2]:.4e}")
 
     # divisão por carga (70/20/10)
     indices = np.random.RandomState(42).permutation(n_cargas)
@@ -334,11 +395,6 @@ def visualiza_distribuicao_dados_separado(
     cargas_val   = cargas_unicas[val_indices]
     cargas_test  = cargas_unicas[test_indices]
 
-    print(f"\n=== DIVISÃO DOS DADOS ===")
-    print(f"  Cargas de treino: {len(cargas_train)}")
-    print(f"  Cargas de validação: {len(cargas_val)}")
-    print(f"  Cargas de teste: {len(cargas_test)}")
-
     n_pontos_por_carga = len(base_eletrostatica) // n_cargas
     N_plus_1 = int(np.sqrt(n_pontos_por_carga))
     if N_plus_1 * N_plus_1 != n_pontos_por_carga:
@@ -352,7 +408,7 @@ def visualiza_distribuicao_dados_separado(
     grid_x = grupo0['x'].unique()
     grid_y = grupo0['y'].unique()
 
-    # reconstrói ρ̃ 2D por carga
+    # reconstrói ρ̃ (x,y) por carga
     densidades_por_carga = {}
     for carga_id in cargas_unicas:
         grupo = base_eletrostatica[base_eletrostatica['carga_id'] == carga_id]
@@ -407,9 +463,9 @@ def cria_modelo_mlp_node(input_dim: int, output_dim: int, parameters: Dict[str, 
     )
 
     print("\n=== MODELO MLP CRIADO ===")
-    print(f"  Dimensão entrada: {input_dim} (pontos de colocação da malha)")
+    print(f"  Dimensão entrada: {input_dim} (pontos de colocação")
     print(f"  Camadas ocultas: {hidden_dims}")
-    print(f"  Dimensão saída: {output_dim} (pontos de colocação da malha)")
+    print(f"  Dimensão saída: {output_dim} (pontos de colocação")
     print(f"  Parâmetros treináveis: {sum(p.numel() for p in model.parameters() if p.requires_grad)}")
     print(f"  Função de ativação: {activation.capitalize()}")
 
@@ -483,7 +539,6 @@ def treina_mlp_node(
     print(f"  Epochs: {epochs}")
     print(f"  Learning rate: {learning_rate}")
     print(f"  Função loss: MSE (Mean Squared Error)")
-    print(f"  Seed: {seed}")
 
     for epoch in range(epochs):
         # treino
@@ -594,7 +649,7 @@ def avalia_metricas_mlp_node(
         'erro_max_test': erro_max_test,
     }
 
-    print("\n=== AVALIAÇÃO DO MODELO MLP - EQUAÇÃO DE POISSON 2D ===")
+    print("\n=== AVALIAÇÃO DO MODELO MLP ===")
     print(f"  RMSE Validação: {rmse_val:.6e}")
     print(f"  R²   Validação: {r2_val:.4f}")
     print(f"  Erro máx. Validação: {erro_max_val:.6e}")
@@ -705,8 +760,8 @@ def visualiza_previsoes_espaco_fases_node(
     y_grid = 0.5 * (dom['ymin'] + dom['ymax']) + 0.5 * (dom['ymax'] - dom['ymin']) * xi_glc
 
     print("\n=== VISUALIZAÇÃO DAS PREVISÕES ===")
-    print(f"  Número de cargas de teste: {len(X_test)}")
-    print(f"  Pontos por carga: {n_pontos}  →  malha {N_plus_1} × {N_plus_1} (GLC)")
+    print(f"  Número de densidades de carga de teste: {len(X_test)}")
+    print(f"  Pontos por densidade de carga: {n_pontos}  →  malha {N_plus_1} × {N_plus_1} (GLC)")
 
     X_test_tensor = torch.tensor(X_test, dtype=torch.float32).to(device)
 
